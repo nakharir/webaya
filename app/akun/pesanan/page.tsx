@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/krezoema/Navbar";
 import Footer from "@/components/krezoema/Footer";
+import { TransferProofUpload } from "@/components/krezoema/TransferProofUpload";
 import { useAuth } from "@/context/AuthContext";
 import { getCustomerOrders, confirmPayment } from "@/lib/api/ecommerce";
 import type { ApiOrder, OrderStatus } from "@/lib/api/types";
@@ -935,6 +936,19 @@ export default function PesananPage() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Transfer Proof Upload Component */}
+              {selectedOrder.status !== "cancelled" && (
+                <TransferProofUpload
+                  order={selectedOrder}
+                  onUploaded={(updated) => {
+                    setSelectedOrder(updated);
+                    setOrders((prev) =>
+                      prev.map((o) => (o.id === updated.id ? updated : o))
+                    );
+                  }}
+                />
               )}
 
               {/* Shipping Address Snapshot */}
