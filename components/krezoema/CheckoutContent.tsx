@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import type { CheckoutShippingMethod, CheckoutState, PreparedCheckoutPayload, ApiOrder } from "@/lib/api/types";
-import { createOrder } from "@/lib/api/ecommerce";
+import { createOrder, confirmPayment } from "@/lib/api/ecommerce";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,7 +20,30 @@ import {
   X,
   PackageCheck,
   Copy,
+  Building2,
+  Clock,
+  Check,
+  Loader2,
 } from "lucide-react";
+
+function formatDeadline(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return new Intl.DateTimeFormat("id-ID", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(d);
+  } catch {
+    return dateStr;
+  }
+}
 
 interface CheckoutFormData {
   nama: string;
@@ -54,6 +77,10 @@ export default function CheckoutContent() {
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [createdOrder, setCreatedOrder] = useState<ApiOrder | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState<boolean>(false);
+  const [confirmPaymentError, setConfirmPaymentError] = useState<string | null>(null);
+  const [isAccountCopied, setIsAccountCopied] = useState<boolean>(false);
+  const [isTotalCopied, setIsTotalCopied] = useState<boolean>(false);
 
   // Checkout page guard: If not logged in, redirect to login with redirect parameter
   useEffect(() => {
@@ -404,6 +431,42 @@ export default function CheckoutContent() {
       }
     };
 
+    const handleCopyAccount = (accNo: string) => {
+      navigator.clipboard.writeText(accNo);
+      setIsAccountCopied(true);
+      setTimeout(() => setIsAccountCopied(false), 2000);
+    };
+
+    const handleCopyTotal = (amount: number) => {
+      navigator.clipboard.writeText(String(amount));
+      setIsTotalCopied(true);
+      setTimeout(() => setIsTotalCopied(false), 2000);
+    };
+
+    const handleConfirmPayment = async () => {
+      if (!createdOrder?.id) return;
+      setIsConfirmingPayment(true);
+      setConfirmPaymentError(null);
+      try {
+        const updated = await confirmPayment(createdOrder.id);
+        setCreatedOrder((prev) =>
+          prev ? { ...prev, payment_status: updated.payment_status } : updated
+        );
+      } catch (err: any) {
+        setConfirmPaymentError(
+          err?.response?.data?.message ||
+            "Gagal mengonfirmasi transfer. Silakan periksa koneksi Anda dan coba lagi."
+        );
+      } finally {
+        setIsConfirmingPayment(false);
+      }
+    };
+
+    const bankName = createdOrder.payment_details?.bank_name || "BCA";
+    const accountNumber = createdOrder.payment_details?.account_number || "8290123456";
+    const accountHolder = createdOrder.payment_details?.account_holder || "KREZOEMA CRAFT";
+    const expiresAt = createdOrder.payment_details?.expires_at;
+
     return (
       <div className="w-full py-12 sm:py-16 lg:py-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -422,11 +485,11 @@ export default function CheckoutContent() {
             </h1>
 
             <p className="font-sans text-sm text-muted-foreground leading-relaxed max-w-lg mx-auto mb-6">
-              Pesanan telah tercatat di sistem KREZOEMA dan siap diproses oleh tim kami.
+              Pesanan telah tercatat di sistem KREZOEMA. Silakan lakukan pembayaran transfer sesuai panduan di bawah.
             </p>
 
             {/* Order Number Highlight Card */}
-            <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-brand-warm border border-border/80 mb-8">
+            <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-brand-warm border border-border/80 mb-6">
               <div className="text-left">
                 <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
                   Nomor Pesanan
@@ -447,6 +510,182 @@ export default function CheckoutContent() {
                   <Copy className="w-4 h-4" />
                 )}
               </button>
+            </div>
+
+            {/* Manual Bank Transfer Payment Box */}
+            <div className="bg-white rounded-3xl border-2 border-brand-pink/20 p-5 sm:p-7 text-left mb-8 max-w-xl mx-auto shadow-sm">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-brand-pink-soft/60 text-brand-pink flex items-center justify-center shrink-0">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs uppercase tracking-wider font-bold text-foreground">
+                      Pembayaran Manual Transfer
+                    </h2>
+                    <span className="text-[11px] text-muted-foreground">
+                      Transfer manual ke rekening resmi KREZOEMA
+                    </span>
+                  </div>
+                </div>
+
+                {/* Payment Status Tag */}
+                {createdOrder.payment_status === "waiting_verification" ? (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 shrink-0">
+                    <Clock className="w-3 h-3" />
+                    Menunggu Verifikasi
+                  </span>
+                ) : createdOrder.payment_status === "paid" ? (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shrink-0">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Sudah Dibayar
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shrink-0">
+                    <AlertCircle className="w-3 h-3" />
+                    Belum Dibayar
+                  </span>
+                )}
+              </div>
+
+              {/* Destination Bank Account Info */}
+              <div className="space-y-3 bg-brand-warm rounded-2xl p-4 border border-border/60 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-medium">Bank Tujuan</span>
+                  <span className="text-xs font-bold text-foreground bg-white px-2.5 py-0.5 rounded-md border border-border/80">
+                    {bankName}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-muted-foreground font-medium block">Nomor Rekening</span>
+                    <span className="font-mono text-base font-bold text-foreground">
+                      {accountNumber}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyAccount(accountNumber)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-brand-pink-soft text-foreground border border-border hover:border-brand-pink/40 transition-colors"
+                  >
+                    {isAccountCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-600 font-semibold">Tersalin</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>Salin Rekening</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/40 pt-2">
+                  <span className="text-xs text-muted-foreground font-medium">Nama Pemilik Rekening</span>
+                  <span className="text-xs font-semibold text-foreground">
+                    {accountHolder}
+                  </span>
+                </div>
+              </div>
+
+              {/* Total to pay */}
+              <div className="flex items-center justify-between bg-brand-pink-soft/20 rounded-2xl p-4 border border-brand-pink/20 mb-4">
+                <div>
+                  <span className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider block">
+                    Total Yang Harus Dibayar
+                  </span>
+                  <span className="font-mono text-lg font-extrabold text-brand-pink-dark">
+                    {formatRupiah(createdOrder.total)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyTotal(createdOrder.total)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-brand-pink-soft text-brand-pink-dark border border-brand-pink/30 transition-colors"
+                >
+                  {isTotalCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-600 font-semibold">Tersalin</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin Total</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Payment Deadline if available */}
+              {expiresAt && (
+                <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/80 rounded-xl px-3.5 py-2.5 mb-4">
+                  <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+                  <span>
+                    Batas Waktu Pembayaran: <strong>{formatDeadline(expiresAt)}</strong>
+                  </span>
+                </div>
+              )}
+
+              {/* Error Message if any */}
+              {confirmPaymentError && (
+                <div className="p-3 mb-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{confirmPaymentError}</span>
+                </div>
+              )}
+
+              {/* Action Button: "Saya sudah transfer" or Status Banner */}
+              {createdOrder.payment_status === "unpaid" ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleConfirmPayment}
+                    disabled={isConfirmingPayment}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-brand-pink hover:bg-brand-pink-dark text-white font-semibold text-sm transition-all shadow-md active:scale-98 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isConfirmingPayment ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Mengonfirmasi Pembayaran...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Saya Sudah Transfer</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Klik tombol di atas setelah Anda melakukan transfer bank agar status pembayaran beralih ke verifikasi admin.
+                  </p>
+                </div>
+              ) : createdOrder.payment_status === "waiting_verification" ? (
+                <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 text-xs text-blue-900 flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-blue-950">
+                      Konfirmasi Transfer Telah Dikirim
+                    </p>
+                    <p className="text-blue-800 leading-relaxed text-[11px]">
+                      Terima kasih! Kami telah menerima konfirmasi Anda. Admin KREZOEMA sedang memverifikasi mutasi pembayaran. Status pesanan akan diperbarui setelah dicek.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Pembayaran Diverifikasi</p>
+                    <p className="text-[11px] text-emerald-800">
+                      Pembayaran Anda telah diverifikasi oleh admin.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Order Summary Snapshot */}
@@ -538,16 +777,16 @@ export default function CheckoutContent() {
             {/* Navigation Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
-                href="/"
-                className="w-full sm:w-auto px-7 py-3 rounded-full bg-brand-pink text-white font-semibold text-sm hover:bg-brand-pink-dark transition-all shadow-none active:scale-95"
+                href="/akun/pesanan"
+                className="w-full sm:w-auto px-7 py-3 rounded-full bg-brand-pink text-white font-semibold text-sm hover:bg-brand-pink-dark transition-all shadow-none active:scale-95 text-center"
               >
-                Kembali ke Beranda
+                Lihat Pesanan Saya
               </Link>
               <Link
-                href="/koleksi"
-                className="w-full sm:w-auto px-7 py-3 rounded-full bg-white border border-border text-foreground font-semibold text-sm hover:border-brand-pink/50 hover:bg-brand-pink-soft/30 transition-all"
+                href="/"
+                className="w-full sm:w-auto px-7 py-3 rounded-full bg-white border border-border text-foreground font-semibold text-sm hover:border-brand-pink/50 hover:bg-brand-pink-soft/30 transition-all text-center"
               >
-                Lihat Koleksi Lagi
+                Kembali ke Beranda
               </Link>
             </div>
           </div>

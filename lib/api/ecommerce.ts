@@ -287,4 +287,25 @@ export async function getCustomerOrder(id: number | string): Promise<ApiOrder> {
   return response.data.data;
 }
 
+export async function confirmPayment(orderId: number | string): Promise<ApiOrder> {
+  const response = await ecommerceClient.post<{ data: ApiOrder }>(
+    `/orders/${encodeURIComponent(String(orderId))}/confirm-payment`
+  );
+  return response.data.data;
+}
+
+export async function uploadTransferProof(
+  orderId: number | string,
+  file: File
+): Promise<ApiOrder> {
+  const formData = new FormData();
+  formData.append("transfer_proof", file);
+  const response = await ecommerceClient.post<{ data: ApiOrder }>(
+    `/orders/${encodeURIComponent(String(orderId))}/upload-proof`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return response.data.data;
+}
+
 export default ecommerceClient;

@@ -67,11 +67,6 @@ export default function AkunPage() {
   const [addressActionError, setAddressActionError] = useState<string | null>(null);
   const [addressActionId, setAddressActionId] = useState<string | null>(null);
 
-  // Active section tab (profil/alamat/pesanan)
-  const [activeTab, setActiveTab] = useState<"profil-alamat" | "pesanan">(
-    "profil-alamat"
-  );
-
   // Sync profile form when customer changes
   useEffect(() => {
     if (customer) {
@@ -219,53 +214,8 @@ export default function AkunPage() {
     }
   };
 
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen flex flex-col bg-brand-warm text-foreground">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center py-20 text-muted-foreground text-sm">
-          Memuat akun Anda...
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  // Not logged in view
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen flex flex-col bg-brand-warm text-foreground antialiased selection:bg-brand-pink-soft selection:text-brand-pink-dark">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center py-16 px-4 sm:px-6">
-          <div className="max-w-md w-full bg-white rounded-3xl border border-border/80 p-8 sm:p-10 text-center shadow-sm">
-            <div className="w-14 h-14 rounded-full bg-brand-pink-soft text-brand-pink-dark flex items-center justify-center mx-auto mb-5">
-              <User className="w-7 h-7" />
-            </div>
-            <h1 className="font-sans text-2xl font-bold text-foreground mb-2">
-              Masuk untuk Melihat Akun
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-8">
-              Masuk atau buat akun baru untuk mengelola profil, alamat pengiriman, dan mempercepat proses checkout.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href="/login?redirect=/akun"
-                className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-brand-pink text-white font-semibold text-xs sm:text-sm hover:bg-brand-pink-dark transition-colors"
-              >
-                Masuk ke Akun
-              </Link>
-              <Link
-                href="/register?redirect=/akun"
-                className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-white border border-border text-foreground font-semibold text-xs sm:text-sm hover:bg-secondary transition-colors"
-              >
-                Daftar Akun Baru
-              </Link>
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
+  if (!isHydrated || !isLoggedIn) {
+    return null; // Auth guard handled by layout.tsx
   }
 
   return (
@@ -276,16 +226,24 @@ export default function AkunPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header & Account Greeting */}
           <div className="mb-8 pb-6 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-xs uppercase tracking-wider text-brand-pink font-semibold block mb-1">
-                KREZOEMA · AKUN SAYA
-              </span>
-              <h1 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-tight">
-                Halo, {customer?.nama}
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Kelola profil pribadimu dan daftar alamat pengiriman.
-              </p>
+            <div className="flex items-center gap-4">
+              {/* Avatar Initials */}
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-brand-pink text-white flex items-center justify-center shrink-0">
+                <span className="text-xl sm:text-2xl font-bold leading-none">
+                  {customer?.nama?.charAt(0)?.toUpperCase() || "K"}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs uppercase tracking-wider text-brand-pink font-semibold block mb-0.5">
+                  KREZOEMA · AKUN SAYA
+                </span>
+                <h1 className="font-sans text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                  Halo, {customer?.nama}
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                  {customer?.email}
+                </p>
+              </div>
             </div>
 
             {/* Quick Actions & Logout */}
@@ -302,29 +260,39 @@ export default function AkunPage() {
             </div>
           </div>
 
-          {/* Section Navigation Tabs */}
-          <div className="flex items-center gap-2 mb-8 border-b border-border/60 pb-3">
-            <button
-              type="button"
-              onClick={() => setActiveTab("profil-alamat")}
-              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
-                activeTab === "profil-alamat"
-                  ? "bg-brand-pink text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-white"
-              }`}
-            >
-              Profil &amp; Alamat
-            </button>
+          {/* Quick Navigation Shortcuts */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
             <Link
               href="/akun/pesanan"
-              className="px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all text-muted-foreground hover:text-foreground hover:bg-white"
+              className="group flex items-center gap-4 bg-white rounded-2xl border border-border/80 p-5 hover:border-brand-pink/40 hover:shadow-sm transition-all"
             >
-              Pesanan Saya
+              <div className="w-11 h-11 rounded-xl bg-brand-pink-soft text-brand-pink-dark flex items-center justify-center shrink-0 group-hover:bg-brand-pink group-hover:text-white transition-colors">
+                <Package className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground">Pesanan Saya</p>
+                <p className="text-xs text-muted-foreground">Riwayat & status pesanan</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-brand-pink transition-colors shrink-0" />
             </Link>
+
+            <a
+              href="#alamat"
+              className="group flex items-center gap-4 bg-white rounded-2xl border border-border/80 p-5 hover:border-brand-pink/40 hover:shadow-sm transition-all"
+            >
+              <div className="w-11 h-11 rounded-xl bg-brand-pink-soft text-brand-pink-dark flex items-center justify-center shrink-0 group-hover:bg-brand-pink group-hover:text-white transition-colors">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground">Alamat Saya</p>
+                <p className="text-xs text-muted-foreground">{addresses.length} alamat tersimpan</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-brand-pink transition-colors shrink-0" />
+            </a>
           </div>
 
-          {activeTab === "profil-alamat" && (
-            <div className="space-y-10">
+          {/* Main Content */}
+          <div className="space-y-10">
               {/* SECTION 1: PROFIL */}
               <section className="bg-white rounded-3xl border border-border/80 p-6 sm:p-8 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border/60">
@@ -516,46 +484,7 @@ export default function AkunPage() {
                 )}
               </section>
             </div>
-          )}
 
-          {/* SECTION 3: PESANAN SAYA */}
-          {activeTab === "pesanan" && (
-            <div className="bg-white rounded-3xl border border-border/80 p-8 sm:p-12 text-center shadow-sm">
-              <div className="w-14 h-14 rounded-full bg-brand-pink-soft text-brand-pink-dark flex items-center justify-center mx-auto mb-4">
-                <Package className="w-7 h-7 stroke-[1.8]" />
-              </div>
-              <h2 className="font-sans text-xl font-bold text-foreground mb-2">
-                Riwayat Pesanan Anda
-              </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed mb-6">
-                Pesanan KREZOEMA dikonfirmasi dan diverifikasi manual melalui WhatsApp oleh tim admin studio kami.
-              </p>
-              <div className="p-4 rounded-2xl bg-brand-warm border border-border/80 max-w-md mx-auto text-xs text-muted-foreground text-left">
-                <p className="font-semibold text-foreground mb-1">
-                  Catatan Pengiriman:
-                </p>
-                <p>
-                  Jika Anda telah melakukan checkout, detail pesanan Anda telah dikirim dan dapat Anda konfirmasi ulang langsung via WhatsApp.
-                </p>
-              </div>
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link
-                  href="/akun/pesanan"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-brand-pink text-white font-semibold text-xs sm:text-sm hover:bg-brand-pink-dark transition-colors shadow-sm"
-                >
-                  <Package className="w-4 h-4" />
-                  <span>Buka Riwayat Pesanan</span>
-                </Link>
-                <Link
-                  href="/koleksi"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full border border-border text-foreground font-semibold text-xs sm:text-sm hover:bg-brand-warm transition-colors"
-                >
-                  <span>Mulai Belanja</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 

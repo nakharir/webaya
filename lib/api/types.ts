@@ -209,6 +209,19 @@ export type OrderStatus =
   | "completed"
   | "cancelled";
 
+export type PaymentStatus =
+  | "unpaid"
+  | "waiting_verification"
+  | "paid"
+  | "rejected";
+
+export interface ApiOrderPaymentDetails {
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+  expires_at?: string | null;
+}
+
 export interface ApiOrderItem {
   id: number;
   order_id: number;
@@ -229,6 +242,9 @@ export interface ApiOrder {
   customer_id: number;
   order_number: string;
   status: OrderStatus;
+  payment_status: PaymentStatus;
+  payment_method?: string;
+  payment_details?: ApiOrderPaymentDetails;
   shipping_method: string;
   shipping_name: string;
   shipping_whatsapp: string;
@@ -250,6 +266,7 @@ export interface ApiOrder {
   subtotal: number;
   shipping_cost: number;
   total: number;
+  transfer_proof_url?: string | null;
   items?: ApiOrderItem[];
   customer?: {
     id: number;

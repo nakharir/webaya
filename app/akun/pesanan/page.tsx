@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/krezoema/Navbar";
 import Footer from "@/components/krezoema/Footer";
 import { useAuth } from "@/context/AuthContext";
-import { getCustomerOrders } from "@/lib/api/ecommerce";
+import { getCustomerOrders, confirmPayment } from "@/lib/api/ecommerce";
 import type { ApiOrder, OrderStatus } from "@/lib/api/types";
 import { formatRupiah } from "@/lib/api/helpers";
 import {
@@ -27,7 +27,42 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageCircle,
+  Building2,
+  Copy,
+  Check,
+  Loader2,
 } from "lucide-react";
+
+// Payment status configuration
+const PAYMENT_STATUS_CONFIG: Record<
+  string,
+  { label: string; bg: string; text: string; border: string }
+> = {
+  unpaid: {
+    label: "Belum Dibayar",
+    bg: "bg-amber-50",
+    text: "text-amber-800",
+    border: "border-amber-200/80",
+  },
+  waiting_verification: {
+    label: "Menunggu Verifikasi",
+    bg: "bg-blue-50",
+    text: "text-blue-800",
+    border: "border-blue-200/80",
+  },
+  paid: {
+    label: "Sudah Dibayar",
+    bg: "bg-emerald-50",
+    text: "text-emerald-800",
+    border: "border-emerald-200/80",
+  },
+  rejected: {
+    label: "Ditolak",
+    bg: "bg-rose-50",
+    text: "text-rose-800",
+    border: "border-rose-200/80",
+  },
+};
 
 // Status configuration matching KREZOEMA craft modern aesthetic
 const STATUS_CONFIG: Record<
@@ -84,6 +119,120 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const TIMELINE_STEPS: { key: OrderStatus; label: string }[] = [
+  { key: "pending", label: "Menunggu" },
+  { key: "confirmed", label: "Dikonfirmasi" },
+  { key: "processing", label: "Diproses" },
+  { key: "shipped", label: "Dikirim" },
+  { key: "completed", label: "Selesai" },
+];
+
+function OrderTimeline({ status }: { status: OrderStatus }) {
+  if (status === "cancelled") {
+    return (
+      <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200/80">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+            <XCircle className="w-4 h-4 stroke-[2]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-rose-900 tracking-wide uppercase">
+                Pesanan Dibatalkan
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-200/80 text-rose-800 font-semibold">
+                Cancelled
+              </span>
+            </div>
+            <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+              Pesanan ini telah dibatalkan dan proses pemesanan tidak dilanjutkan.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentIndex = TIMELINE_STEPS.findIndex((step) => step.key === status);
+  const activeIndex = currentIndex === -1 ? 0 : currentIndex;
+
+  return (
+    <div className="p-4 sm:p-5 rounded-2xl bg-white border border-border/80 space-y-3">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-semibold text-foreground uppercase tracking-wider text-[11px]">
+          Status Pesanan
+        </span>
+        <span className="text-muted-foreground text-[11px]">
+          Langkah {activeIndex + 1} dari {TIMELINE_STEPS.length}
+        </span>
+      </div>
+
+      {/* Responsive Horizontal Stepper */}
+      <div className="pt-1 pb-1">
+        <div className="grid grid-cols-5 items-start relative">
+          {TIMELINE_STEPS.map((step, idx) => {
+            const isCompleted = idx < activeIndex;
+            const isCurrent = idx === activeIndex;
+
+            return (
+              <div
+                key={step.key}
+                className="flex flex-col items-center text-center relative group"
+              >
+                {/* Connecting Line Left */}
+                {idx > 0 && (
+                  <div
+                    className={`absolute top-3.5 right-1/2 left-[-50%] h-[2px] -translate-y-1/2 z-0 transition-colors ${
+                      idx <= activeIndex ? "bg-brand-pink" : "bg-border/80"
+                    }`}
+                  />
+                )}
+
+                {/* Step Node */}
+                <div
+                  className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    isCurrent
+                      ? "bg-brand-pink text-white ring-4 ring-brand-pink/20 shadow-xs"
+                      : isCompleted
+                      ? "bg-brand-pink text-white"
+                      : "bg-brand-warm border border-border text-muted-foreground"
+                  }`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  ) : (
+                    <span className="text-[11px]">{idx + 1}</span>
+                  )}
+                </div>
+
+                {/* Step Label */}
+                <div className="mt-2 px-0.5">
+                  <span
+                    className={`block text-[10px] sm:text-xs leading-tight transition-colors ${
+                      isCurrent
+                        ? "font-bold text-brand-pink-dark"
+                        : isCompleted
+                        ? "font-semibold text-foreground"
+                        : "font-normal text-muted-foreground"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  {isCurrent && (
+                    <span className="inline-block mt-0.5 text-[9px] font-semibold text-brand-pink uppercase tracking-wider">
+                      Saat ini
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatOrderDate(dateStr?: string | null): string {
   if (!dateStr) return "-";
   try {
@@ -113,6 +262,46 @@ export default function PesananPage() {
   const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [isAccountCopied, setIsAccountCopied] = useState(false);
+  const [isTotalCopied, setIsTotalCopied] = useState(false);
+
+  const handleConfirmPayment = async (orderId: number) => {
+    setIsConfirmingPayment(true);
+    setConfirmError(null);
+    try {
+      const updated = await confirmPayment(orderId);
+      setSelectedOrder((prev) =>
+        prev && prev.id === orderId
+          ? { ...prev, payment_status: updated.payment_status }
+          : prev
+      );
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId ? { ...o, payment_status: updated.payment_status } : o
+        )
+      );
+    } catch (err: any) {
+      setConfirmError(
+        err?.response?.data?.message || "Gagal mengonfirmasi transfer pembayaran."
+      );
+    } finally {
+      setIsConfirmingPayment(false);
+    }
+  };
+
+  const handleCopyAccount = (accNo: string) => {
+    navigator.clipboard.writeText(accNo);
+    setIsAccountCopied(true);
+    setTimeout(() => setIsAccountCopied(false), 2000);
+  };
+
+  const handleCopyTotal = (amount: number) => {
+    navigator.clipboard.writeText(String(amount));
+    setIsTotalCopied(true);
+    setTimeout(() => setIsTotalCopied(false), 2000);
+  };
 
   // Fetch orders from existing endpoint GET /api/ecommerce/orders
   const fetchOrders = useCallback(async () => {
@@ -370,8 +559,21 @@ export default function PesananPage() {
                           </div>
                         </div>
 
-                        {/* Status Badge */}
-                        <div className="self-start sm:self-auto">
+                        {/* Status Badges */}
+                        <div className="self-start sm:self-auto flex items-center gap-2 flex-wrap">
+                          {order.payment_status && (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                PAYMENT_STATUS_CONFIG[order.payment_status]?.bg || "bg-gray-50"
+                              } ${
+                                PAYMENT_STATUS_CONFIG[order.payment_status]?.text || "text-gray-700"
+                              } ${
+                                PAYMENT_STATUS_CONFIG[order.payment_status]?.border || "border-gray-200"
+                              }`}
+                            >
+                              {PAYMENT_STATUS_CONFIG[order.payment_status]?.label || order.payment_status}
+                            </span>
+                          )}
                           <span
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
                           >
@@ -504,12 +706,27 @@ export default function PesananPage() {
                       STATUS_CONFIG.pending;
                     const StatusIcon = statusCfg.icon;
                     return (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-                      >
-                        <StatusIcon className="w-3 h-3" />
-                        {statusCfg.label}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {selectedOrder.payment_status && (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                              PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.bg || "bg-gray-50"
+                            } ${
+                              PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.text || "text-gray-700"
+                            } ${
+                              PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.border || "border-gray-200"
+                            }`}
+                          >
+                            {PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.label || selectedOrder.payment_status}
+                          </span>
+                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
+                        >
+                          <StatusIcon className="w-3 h-3" />
+                          {statusCfg.label}
+                        </span>
+                      </div>
                     );
                   })()}
                 </div>
@@ -546,6 +763,179 @@ export default function PesananPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Status Timeline */}
+              <OrderTimeline status={selectedOrder.status} />
+
+              {/* Manual Bank Transfer Payment Box */}
+              {selectedOrder.status !== "cancelled" && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border border-brand-pink/30 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-brand-pink-soft/60 text-brand-pink flex items-center justify-center">
+                        <Building2 className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs uppercase tracking-wider font-bold text-foreground">
+                          Pembayaran Transfer Bank
+                        </h4>
+                        <span className="text-[11px] text-muted-foreground">
+                          Rekening Resmi KREZOEMA
+                        </span>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.bg || "bg-gray-50"
+                      } ${
+                        PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.text || "text-gray-700"
+                      } ${
+                        PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.border || "border-gray-200"
+                      }`}
+                    >
+                      {PAYMENT_STATUS_CONFIG[selectedOrder.payment_status]?.label || selectedOrder.payment_status}
+                    </span>
+                  </div>
+
+                  {/* Bank Account Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-brand-warm rounded-xl p-3.5 border border-border/60 text-xs">
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Bank Tujuan</span>
+                      <span className="font-bold text-foreground">
+                        {selectedOrder.payment_details?.bank_name || "BCA"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Nama Pemilik Rekening</span>
+                      <span className="font-semibold text-foreground">
+                        {selectedOrder.payment_details?.account_holder || "KREZOEMA CRAFT"}
+                      </span>
+                    </div>
+
+                    <div className="sm:col-span-2 flex items-center justify-between border-t border-border/40 pt-2">
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Nomor Rekening</span>
+                        <span className="font-mono text-sm font-bold text-foreground">
+                          {selectedOrder.payment_details?.account_number || "8290123456"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopyAccount(
+                            selectedOrder.payment_details?.account_number || "8290123456"
+                          )
+                        }
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white hover:bg-brand-pink-soft text-foreground border border-border transition-colors"
+                      >
+                        {isAccountCopied ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-emerald-600 font-semibold">Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3 text-muted-foreground" />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="sm:col-span-2 flex items-center justify-between border-t border-border/40 pt-2">
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Total Tagihan</span>
+                        <span className="font-mono text-sm font-extrabold text-brand-pink-dark">
+                          {formatRupiah(selectedOrder.total)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyTotal(selectedOrder.total)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white hover:bg-brand-pink-soft text-brand-pink-dark border border-brand-pink/30 transition-colors"
+                      >
+                        {isTotalCopied ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-emerald-600 font-semibold">Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Nominal</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {selectedOrder.payment_details?.expires_at && (
+                      <div className="sm:col-span-2 flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50/80 border border-amber-200/60 rounded-lg px-2.5 py-1.5">
+                        <Clock className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                        <span>
+                          Batas Waktu:{" "}
+                          <strong>{formatOrderDate(selectedOrder.payment_details.expires_at)}</strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {confirmError && (
+                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{confirmError}</span>
+                    </div>
+                  )}
+
+                  {/* Button "Saya sudah transfer" */}
+                  {selectedOrder.payment_status === "unpaid" ? (
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmPayment(selectedOrder.id)}
+                        disabled={isConfirmingPayment}
+                        className="w-full py-2.5 px-4 rounded-xl bg-brand-pink hover:bg-brand-pink-dark text-white font-semibold text-xs transition-all shadow-sm active:scale-98 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isConfirmingPayment ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Mengonfirmasi Transfer...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Saya Sudah Transfer</span>
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[10px] text-muted-foreground text-center">
+                        Tekan tombol ini setelah Anda selesai melakukan transfer bank agar tim kami segera memverifikasi pesanan Anda.
+                      </p>
+                    </div>
+                  ) : selectedOrder.payment_status === "waiting_verification" ? (
+                    <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
+                      <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-blue-950">Menunggu Verifikasi Admin</p>
+                        <p className="text-blue-800 text-[11px] leading-relaxed">
+                          Anda telah mengonfirmasi pembayaran. Admin sedang memverifikasi mutasi bank Anda.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Pembayaran Lunas</p>
+                        <p className="text-[11px] text-emerald-800">
+                          Pembayaran Anda telah diverifikasi oleh admin.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Shipping Address Snapshot */}
               <div>
