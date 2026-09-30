@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import type { CheckoutShippingMethod, CheckoutState, PreparedCheckoutPayload, ApiOrder } from "@/lib/api/types";
-import { createOrder, confirmPayment } from "@/lib/api/ecommerce";
+import { createOrder } from "@/lib/api/ecommerce";
+import { TransferProofUpload } from "@/components/krezoema/TransferProofUpload";
 import {
   ArrowLeft,
   ArrowRight,
@@ -77,8 +78,6 @@ export default function CheckoutContent() {
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [createdOrder, setCreatedOrder] = useState<ApiOrder | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
-  const [isConfirmingPayment, setIsConfirmingPayment] = useState<boolean>(false);
-  const [confirmPaymentError, setConfirmPaymentError] = useState<string | null>(null);
   const [isAccountCopied, setIsAccountCopied] = useState<boolean>(false);
   const [isTotalCopied, setIsTotalCopied] = useState<boolean>(false);
 
@@ -443,25 +442,6 @@ export default function CheckoutContent() {
       setTimeout(() => setIsTotalCopied(false), 2000);
     };
 
-    const handleConfirmPayment = async () => {
-      if (!createdOrder?.id) return;
-      setIsConfirmingPayment(true);
-      setConfirmPaymentError(null);
-      try {
-        const updated = await confirmPayment(createdOrder.id);
-        setCreatedOrder((prev) =>
-          prev ? { ...prev, payment_status: updated.payment_status } : updated
-        );
-      } catch (err: any) {
-        setConfirmPaymentError(
-          err?.response?.data?.message ||
-            "Gagal mengonfirmasi transfer. Silakan periksa koneksi Anda dan coba lagi."
-        );
-      } finally {
-        setIsConfirmingPayment(false);
-      }
-    };
-
     const bankName = createdOrder.payment_details?.bank_name || "BCA";
     const accountNumber = createdOrder.payment_details?.account_number || "8290123456";
     const accountHolder = createdOrder.payment_details?.account_holder || "KREZOEMA CRAFT";
@@ -630,62 +610,11 @@ export default function CheckoutContent() {
                 </div>
               )}
 
-              {/* Error Message if any */}
-              {confirmPaymentError && (
-                <div className="p-3 mb-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{confirmPaymentError}</span>
-                </div>
-              )}
-
-              {/* Action Button: "Saya sudah transfer" or Status Banner */}
-              {createdOrder.payment_status === "unpaid" ? (
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={handleConfirmPayment}
-                    disabled={isConfirmingPayment}
-                    className="w-full py-3.5 px-4 rounded-2xl bg-brand-pink hover:bg-brand-pink-dark text-white font-semibold text-sm transition-all shadow-md active:scale-98 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isConfirmingPayment ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Mengonfirmasi Pembayaran...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Saya Sudah Transfer</span>
-                      </>
-                    )}
-                  </button>
-                  <p className="text-[11px] text-muted-foreground text-center">
-                    Klik tombol di atas setelah Anda melakukan transfer bank agar status pembayaran beralih ke verifikasi admin.
-                  </p>
-                </div>
-              ) : createdOrder.payment_status === "waiting_verification" ? (
-                <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 text-xs text-blue-900 flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-semibold text-blue-950">
-                      Konfirmasi Transfer Telah Dikirim
-                    </p>
-                    <p className="text-blue-800 leading-relaxed text-[11px]">
-                      Terima kasih! Kami telah menerima konfirmasi Anda. Admin KREZOEMA sedang memverifikasi mutasi pembayaran. Status pesanan akan diperbarui setelah dicek.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">Pembayaran Diverifikasi</p>
-                    <p className="text-[11px] text-emerald-800">
-                      Pembayaran Anda telah diverifikasi oleh admin.
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Transfer Proof Upload Component */}
+              <TransferProofUpload
+                order={createdOrder}
+                onUploaded={(updated) => setCreatedOrder(updated)}
+              />
             </div>
 
             {/* Order Summary Snapshot */}

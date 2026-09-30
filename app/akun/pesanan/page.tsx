@@ -7,7 +7,7 @@ import Navbar from "@/components/krezoema/Navbar";
 import Footer from "@/components/krezoema/Footer";
 import { TransferProofUpload } from "@/components/krezoema/TransferProofUpload";
 import { useAuth } from "@/context/AuthContext";
-import { getCustomerOrders, confirmPayment } from "@/lib/api/ecommerce";
+import { getCustomerOrders } from "@/lib/api/ecommerce";
 import type { ApiOrder, OrderStatus } from "@/lib/api/types";
 import { formatRupiah } from "@/lib/api/helpers";
 import {
@@ -32,6 +32,7 @@ import {
   Copy,
   Check,
   Loader2,
+  UploadCloud,
 } from "lucide-react";
 
 // Payment status configuration
@@ -263,34 +264,9 @@ export default function PesananPage() {
   const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isAccountCopied, setIsAccountCopied] = useState(false);
   const [isTotalCopied, setIsTotalCopied] = useState(false);
 
-  const handleConfirmPayment = async (orderId: number) => {
-    setIsConfirmingPayment(true);
-    setConfirmError(null);
-    try {
-      const updated = await confirmPayment(orderId);
-      setSelectedOrder((prev) =>
-        prev && prev.id === orderId
-          ? { ...prev, payment_status: updated.payment_status }
-          : prev
-      );
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId ? { ...o, payment_status: updated.payment_status } : o
-        )
-      );
-    } catch (err: any) {
-      setConfirmError(
-        err?.response?.data?.message || "Gagal mengonfirmasi transfer pembayaran."
-      );
-    } finally {
-      setIsConfirmingPayment(false);
-    }
-  };
 
   const handleCopyAccount = (accNo: string) => {
     navigator.clipboard.writeText(accNo);
@@ -611,8 +587,18 @@ export default function PesananPage() {
                           </div>
                         </div>
 
-                        {/* Action Button: Lihat Detail */}
-                        <div className="pt-2 sm:pt-0">
+                        {/* Action Buttons: Upload Bukti & Lihat Detail */}
+                        <div className="pt-2 sm:pt-0 flex items-center gap-2 flex-wrap">
+                          {order.payment_status !== "paid" && order.status !== "cancelled" && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOrder(order)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-brand-pink text-white text-xs sm:text-sm font-semibold hover:bg-brand-pink-dark transition-colors shadow-2xs cursor-pointer"
+                            >
+                              <UploadCloud className="w-3.5 h-3.5" />
+                              <span>{order.transfer_proof_url ? "Ganti Bukti" : "Upload Bukti"}</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setSelectedOrder(order)}
@@ -881,60 +867,6 @@ export default function PesananPage() {
                       </div>
                     )}
                   </div>
-
-                  {confirmError && (
-                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{confirmError}</span>
-                    </div>
-                  )}
-
-                  {/* Button "Saya sudah transfer" */}
-                  {selectedOrder.payment_status === "unpaid" ? (
-                    <div className="space-y-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmPayment(selectedOrder.id)}
-                        disabled={isConfirmingPayment}
-                        className="w-full py-2.5 px-4 rounded-xl bg-brand-pink hover:bg-brand-pink-dark text-white font-semibold text-xs transition-all shadow-sm active:scale-98 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {isConfirmingPayment ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Mengonfirmasi Transfer...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Saya Sudah Transfer</span>
-                          </>
-                        )}
-                      </button>
-                      <p className="text-[10px] text-muted-foreground text-center">
-                        Tekan tombol ini setelah Anda selesai melakukan transfer bank agar tim kami segera memverifikasi pesanan Anda.
-                      </p>
-                    </div>
-                  ) : selectedOrder.payment_status === "waiting_verification" ? (
-                    <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
-                      <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <p className="font-semibold text-blue-950">Menunggu Verifikasi Admin</p>
-                        <p className="text-blue-800 text-[11px] leading-relaxed">
-                          Anda telah mengonfirmasi pembayaran. Admin sedang memverifikasi mutasi bank Anda.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold">Pembayaran Lunas</p>
-                        <p className="text-[11px] text-emerald-800">
-                          Pembayaran Anda telah diverifikasi oleh admin.
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
