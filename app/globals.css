@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* KREZOEMA Warm Palette */
+    --background: 38 25% 97%;       /* #FAF8F5 Warm White */
+    --foreground: 280 8% 15%;       /* #272329 Charcoal */
+    --card: 0 0% 100%;              /* #FFFFFF Pure White Surface */
+    --card-foreground: 280 8% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 280 8% 15%;
+    --primary: 340 59% 64%;          /* #D96C91 Primary Pink */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF White */
+    --secondary: 36 20% 93%;        /* #F3EFEA Soft Sand */
+    --secondary-foreground: 280 8% 15%;
+    --muted: 36 15% 91%;            /* #ECE6DC */
+    --muted-foreground: 240 4% 45%; /* #6F6E76 Subtle Charcoal */
+    --accent: 340 65% 93%;          /* #F8E4EB Soft Pink */
+    --accent-foreground: 340 42% 52%;/* #B94F76 Dark Pink */
+    --destructive: 350 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 36 16% 87%;           /* #E5DFD5 Warm Border */
+    --input: 36 16% 87%;
+    --ring: 340 59% 64%;            /* #D96C91 Primary Pink Accent */
+    --radius: 0.625rem;             /* 10px */
+
+    /* KREZOEMA Restrained Pink Brand Palette */
+    --brand-warm: #FAF8F5;
+    --brand-cream: #F4EFEA;
+    --brand-charcoal: #272329;
+    --brand-pink: #D96C91;
+    --brand-pink-soft: #F8E4EB;
+    --brand-pink-dark: #B94F76;
+    --brand-purple: #7C3AED;
+    --brand-magenta: #DB2777;
+    --brand-red: #E11D48;
+    --brand-orange: #EA580C;
+    --brand-yellow: #CA8A04;
+  }
+
+  .dark {
+    --background: 240 6% 10%;
+    --foreground: 38 25% 97%;
+    --card: 240 6% 12%;
+    --card-foreground: 38 25% 97%;
+    --popover: 240 6% 12%;
+    --popover-foreground: 38 25% 97%;
+    --primary: 38 25% 97%;
+    --primary-foreground: 240 6% 14%;
+    --secondary: 240 5% 18%;
+    --secondary-foreground: 38 25% 97%;
+    --muted: 240 5% 20%;
+    --muted-foreground: 240 4% 65%;
+    --accent: 240 5% 20%;
+    --accent-foreground: 38 25% 97%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 38 25% 97%;
+    --border: 240 5% 22%;
+    --input: 240 5% 22%;
+    --ring: 262 83% 58%;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-jakarta), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+  }
+
+  /* Headings default to Plus Jakarta Sans for Simple Modern Craft clarity */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .font-serif {
+    font-family: var(--font-playfair), Georgia, serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Custom Selection Color */
+::selection {
+  background-color: #F8E4EB;
+  color: #B94F76;
+}
+
+/* Slim Warm Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF8F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D9D2C7;
+  border-radius: 9999px;
+  border: 2px solid #FAF8F5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #BDB5A7;
+}
+
+/* Hide scrollbar for clean horizontal scrolls */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
