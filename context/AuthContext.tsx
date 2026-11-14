@@ -37,6 +37,7 @@ export interface CustomerAddress {
   nama: string;
   whatsapp: string;
   alamat: string;
+  kelurahan: string;
   kecamatan: string;
   kotaKabupaten: string;
   provinsi: string;
@@ -99,6 +100,7 @@ function mapApiAddress(address: ApiCustomerAddress): CustomerAddress {
     nama: address.recipient_name,
     whatsapp: address.whatsapp,
     alamat: address.address,
+    kelurahan: address.village || '',
     kecamatan: address.district,
     kotaKabupaten: address.city,
     provinsi: address.province,
@@ -113,6 +115,7 @@ function mapAddressPayload(address: Omit<CustomerAddress, "id">) {
     recipient_name: address.nama.trim(),
     whatsapp: address.whatsapp.trim(),
     address: address.alamat.trim(),
+    village: (address.kelurahan || '').trim(),
     district: address.kecamatan.trim(),
     city: address.kotaKabupaten.trim(),
     province: address.provinsi.trim(),

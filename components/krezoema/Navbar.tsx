@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 interface NavItem {
   label: string;
@@ -34,7 +35,12 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { cartItemCount, isHydrated: isCartHydrated } = useCart();
-  const { customer, isLoggedIn, logout, isHydrated: isAuthHydrated } = useAuth();
+  const {
+    customer,
+    isLoggedIn,
+    logout,
+    isHydrated: isAuthHydrated,
+  } = useAuth();
 
   const totalItems = isCartHydrated ? cartItemCount() : 0;
   const [isScrolled, setIsScrolled] = useState(false);
@@ -103,14 +109,11 @@ export default function Navbar() {
             className="flex items-center gap-3 group focus:outline-none"
             aria-label="KREZOEMA Beranda"
           >
-            <div className="flex flex-col">
-              <span className="font-sans text-xl sm:text-2xl tracking-[0.12em] font-extrabold text-foreground leading-none transition-colors group-hover:text-brand-pink">
-                KREZOEMA
-              </span>
-              <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold mt-1">
-                Craft &amp; Accessories
-              </span>
-            </div>
+            <img
+              src={BRANDING_ASSETS.logo}
+              alt="KREZOEMA"
+              className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+            />
           </Link>
 
           {/* Desktop Navigation Links */}
@@ -135,7 +138,11 @@ export default function Navbar() {
                     <motion.div
                       layoutId="activeNavIndicator"
                       className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-pink rounded-full"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 30,
+                      }}
                     />
                   )}
                 </Link>
@@ -274,7 +281,9 @@ export default function Navbar() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2.5 rounded-full text-foreground hover:bg-secondary/70 transition-colors focus:outline-none"
-              aria-label={mobileMenuOpen ? "Tutup menu navigasi" : "Buka menu navigasi"}
+              aria-label={
+                mobileMenuOpen ? "Tutup menu navigasi" : "Buka menu navigasi"
+              }
               aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? (
@@ -326,7 +335,9 @@ export default function Navbar() {
                 {isLoggedIn ? (
                   <>
                     <div className="px-1 py-1">
-                      <span className="text-xs text-muted-foreground">Masuk sebagai</span>
+                      <span className="text-xs text-muted-foreground">
+                        Masuk sebagai
+                      </span>
                       <p className="text-sm font-bold text-foreground">
                         {customer?.nama}
                       </p>

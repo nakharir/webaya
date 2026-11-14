@@ -3,6 +3,7 @@ import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -36,8 +37,8 @@ export const metadata: Metadata = {
   authors: [{ name: "KREZOEMA" }],
   creator: "KREZOEMA",
   icons: {
-    icon: "/logo-krezoema.png",
-    apple: "/logo-krezoema.png",
+    icon: BRANDING_ASSETS.favicon,
+    apple: BRANDING_ASSETS.favicon,
   },
   openGraph: {
     title: "KREZOEMA — Creative Craft & Handmade Accessories",
@@ -45,6 +46,7 @@ export const metadata: Metadata = {
       "Dari kreativitas menjadi karya, dari karya menjadi identitas. Studio kerajinan kreatif dan aksesoris handmade est. 2017.",
     type: "website",
     locale: "id_ID",
+    images: [BRANDING_ASSETS.logo],
   },
 };
 

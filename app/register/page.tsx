@@ -8,6 +8,7 @@ import Footer from "@/components/krezoema/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { getSafeRedirectUrl } from "@/lib/api/helpers";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 function RegisterForm() {
   const router = useRouter();
@@ -100,6 +101,17 @@ function RegisterForm() {
     <div className="max-w-md w-full mx-auto">
       <div className="bg-white rounded-3xl border border-border/80 p-7 sm:p-9 shadow-sm">
         <div className="text-center mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center mb-4 group focus:outline-none"
+            aria-label="KREZOEMA Beranda"
+          >
+            <img
+              src={BRANDING_ASSETS.logo}
+              alt="KREZOEMA"
+              className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+          </Link>
           <span className="text-xs uppercase tracking-wider text-brand-pink font-semibold block mb-2">
             Akun KREZOEMA
           </span>

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 export default function NavigationBar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -36,10 +37,11 @@ export default function NavigationBar() {
         <div className="flex items-center gap-8 ml-4 md:ml-20">
           <Link href="/">
             <Image
-              src="/logosd.png"
-              width={50}
-              height={50}
-              alt="Logo Sekolah"
+              src={BRANDING_ASSETS.logo}
+              width={120}
+              height={40}
+              alt="KREZOEMA"
+              className="h-10 w-auto object-contain"
             />
           </Link>
 

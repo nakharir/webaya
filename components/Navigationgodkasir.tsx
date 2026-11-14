@@ -3,6 +3,7 @@ import Image from "next/image";
 import React, { useState } from "react";
 import Link from "next/link";
 import { Button } from "./ui/button";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 export default function NavigationBar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,7 +14,7 @@ export default function NavigationBar() {
       <div className="flex justify-between items-center">
         {/* Logo */}
         <div className="flex-shrink-0">
-          <Image src="/logoGodong.svg" width={128} height={29} alt="godong.id Logo" />
+          <Image src={BRANDING_ASSETS.logo} width={128} height={45} alt="KREZOEMA" className="h-10 w-auto object-contain" />
         </div>
 
         {/* Menu Desktop */}

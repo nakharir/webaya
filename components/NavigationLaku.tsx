@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 export default function NavigationBar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // State for mobile menu toggle
@@ -21,7 +22,7 @@ export default function NavigationBar() {
       {/* Logo */}
       <div className="flex justify-between items-center">
         <div className="flex-shrink-0">
-          <img src="/logolaku.svg" width={128} height={29} alt="godong.id Logo" />
+          <img src={BRANDING_ASSETS.logo} width={128} height={45} alt="KREZOEMA" className="h-10 w-auto object-contain" />
         </div>
 
         {/* Desktop Navigation Menu */}

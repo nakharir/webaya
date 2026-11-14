@@ -19,6 +19,8 @@ import type {
   CustomerAddressPayload,
   ApiOrder,
   PreparedCheckoutPayload,
+  CalculateShippingResponse,
+  ShippingRateOption,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -145,10 +147,6 @@ export async function getProductBySlug(slug: string): Promise<ApiProduct> {
 // Customer Authentication Endpoints (Stage 13C)
 // ============================================================================
 
-/**
- * Register a new customer with Laravel backend.
- * Issues Sanctum Bearer token upon success.
- */
 export async function registerCustomer(
   payload: RegisterCustomerPayload
 ): Promise<CustomerAuthResponse> {
@@ -166,10 +164,6 @@ export async function registerCustomer(
   return response.data;
 }
 
-/**
- * Authenticate customer credentials against Laravel backend.
- * Issues Sanctum Bearer token upon success.
- */
 export async function loginCustomer(
   payload: LoginCustomerPayload
 ): Promise<CustomerAuthResponse> {
@@ -187,17 +181,11 @@ export async function loginCustomer(
   return response.data;
 }
 
-/**
- * Log out authenticated customer by revoking current Sanctum token on backend.
- */
 export async function logoutCustomer(): Promise<{ message: string }> {
   const response = await ecommerceClient.post<{ message: string }>("/auth/logout");
   return response.data;
 }
 
-/**
- * Retrieve authenticated customer profile via Sanctum token.
- */
 export async function getCurrentCustomer(): Promise<ApiCustomer> {
   const response = await ecommerceClient.get<{ data?: ApiCustomer; message?: string }>("/auth/me");
   const data = response.data?.data;
@@ -209,9 +197,6 @@ export async function getCurrentCustomer(): Promise<ApiCustomer> {
   return data;
 }
 
-/**
- * Update authenticated customer profile.
- */
 export async function updateCustomerProfile(
   payload: UpdateCustomerProfilePayload
 ): Promise<ApiCustomer> {
@@ -264,6 +249,23 @@ export async function setDefaultCustomerAddress(id: string | number): Promise<Ap
     `/addresses/${encodeURIComponent(String(id))}/default`
   );
   return response.data.data;
+}
+
+// ============================================================================
+// Shipping Calculation (Stage 15)
+// ============================================================================
+
+export async function calculateShippingRates(payload: {
+  address_id?: number;
+  province?: string;
+  city?: string;
+  items: { product_id: number; variant_id?: number | null; quantity: number }[];
+}): Promise<CalculateShippingResponse> {
+  const response = await ecommerceClient.post<CalculateShippingResponse>(
+    "/shipping/calculate",
+    payload
+  );
+  return response.data;
 }
 
 // ============================================================================

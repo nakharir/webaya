@@ -917,6 +917,31 @@ export default function PesananPage() {
                       .filter(Boolean)
                       .join(", ")}
                   </div>
+                  <div className="pt-2 mt-2 border-t border-border/60 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Kurir & Layanan:</span>
+                      <span className="font-semibold text-foreground">
+                        {selectedOrder.shipping_courier || selectedOrder.shipping_method}
+                        {selectedOrder.shipping_service ? ` - ${selectedOrder.shipping_service}` : ''}
+                      </span>
+                    </div>
+                    {Boolean(selectedOrder.total_weight) && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Berat Paket:</span>
+                        <span className="font-medium text-foreground">
+                          {selectedOrder.total_weight}g (~{selectedOrder.total_weight_kg || Math.ceil((selectedOrder.total_weight || 0) / 1000)} kg)
+                        </span>
+                      </div>
+                    )}
+                    {selectedOrder.tracking_number && (
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-muted-foreground text-xs">Nomor Resi:</span>
+                        <span className="font-mono font-bold text-xs text-brand-pink bg-pink-50 px-2 py-0.5 rounded border border-pink-200">
+                          {selectedOrder.tracking_number}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

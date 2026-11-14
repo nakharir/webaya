@@ -10,7 +10,6 @@ export default function HeroSection() {
     <section className="relative bg-brand-warm pt-10 pb-16 sm:pt-16 sm:pb-24 lg:pt-20 lg:pb-28 border-b border-border/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
-          
           {/* Narrative Column (7 cols on desktop) */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -31,7 +30,8 @@ export default function HeroSection() {
 
             {/* Subheadline */}
             <p className="font-sans text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl mb-8 sm:mb-10 font-normal">
-              Temukan material dan perlengkapan craft untuk mengubah ide sederhana menjadi karya yang punya cerita.
+              Temukan material dan perlengkapan craft untuk mengubah ide
+              sederhana menjadi karya yang punya cerita.
             </p>
 
             {/* Action CTAs */}
@@ -113,7 +113,6 @@ export default function HeroSection() {
               </div>
             </div>
           </motion.div>
-
         </div>
       </div>
     </section>

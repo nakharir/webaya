@@ -17,6 +17,7 @@ import { Button } from "./ui/button";
 import axios from "axios";
 import { apiEndpoints } from "@/app/api/api";
 import { cn } from "@/lib/utils";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 interface contentNavbarGeneral {
   id: number;
@@ -62,7 +63,7 @@ export default function NavigationBar() {
     <div className="grid grid-cols-6 shadow-md w-full h-full py-4 px-6 items-center">
       {/* Logo */}
       <div className="col-span-1 flex justify-center">
-        <Image src="/logoGodong.svg" width={128} height={29} alt="godong.id Logo" />
+        <Image src={BRANDING_ASSETS.logo} width={128} height={45} alt="KREZOEMA" className="h-10 w-auto object-contain" />
       </div>
 
       {/* Navigation Menu */}

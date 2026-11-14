@@ -2,10 +2,16 @@
 
 import React from "react";
 import Link from "next/link";
-import { Instagram, MessageCircle, MapPin, Clock, ArrowUpRight } from "lucide-react";
+import {
+  Instagram,
+  MessageCircle,
+  MapPin,
+  Clock,
+  ArrowUpRight,
+} from "lucide-react";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 export default function Footer() {
-
   return (
     <footer className="bg-brand-cream border-t border-border/80 text-foreground transition-colors">
       {/* Brand Statement Banner */}
@@ -16,7 +22,8 @@ export default function Footer() {
               KREZOEMA Philosophy — Est. 2017
             </span>
             <p className="font-sans text-xl sm:text-2xl text-foreground font-bold italic leading-snug">
-              &ldquo;Dari kreativitas menjadi karya, dari karya menjadi identitas.&rdquo;
+              &ldquo;Dari kreativitas menjadi karya, dari karya menjadi
+              identitas.&rdquo;
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
@@ -34,21 +41,26 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
           {/* Brand Info */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-block mb-4 focus:outline-none group">
-              <div className="flex flex-col">
-                <span className="font-sans text-xl sm:text-2xl tracking-[0.12em] font-extrabold text-foreground leading-none transition-colors group-hover:text-brand-pink">
-                  KREZOEMA
-                </span>
-                <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold mt-1">
-                  Craft &amp; Accessories
-                </span>
-              </div>
+            <Link
+              href="/"
+              className="flex items-center gap-3 mb-4 focus:outline-none group"
+              aria-label="KREZOEMA Beranda"
+            >
+              <img
+                src={BRANDING_ASSETS.logo}
+                alt="KREZOEMA"
+                className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              />
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mb-6">
-              Studio kerajinan kreatif dan aksesoris handmade. Kami menyediakan material berkualitas, beads artistik, dan karya kerajinan tangan penuh cerita yang melengkapi ekspresi diri Anda.
+              Studio kerajinan kreatif dan aksesoris handmade. Kami menyediakan
+              material berkualitas, beads artistik, dan karya kerajinan tangan
+              penuh cerita yang melengkapi ekspresi diri Anda.
             </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Berdiri Sejak 2017</span>
+              <span className="font-medium text-foreground">
+                Berdiri Sejak 2017
+              </span>
               <span>•</span>
               <span>Handcrafted in Indonesia</span>
             </div>
@@ -169,7 +181,8 @@ export default function Footer() {
               <div className="flex items-start gap-2.5">
                 <Clock className="w-4 h-4 mt-0.5 text-foreground shrink-0" />
                 <span className="text-xs leading-relaxed">
-                  Senin – Sabtu<br />
+                  Senin – Sabtu
+                  <br />
                   09.00 – 17.00 WIB
                 </span>
               </div>

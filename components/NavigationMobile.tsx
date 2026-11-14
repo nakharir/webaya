@@ -11,6 +11,7 @@ import {
 
 import Link from "next/link";
 import { Button } from "./ui/button";
+import { BRANDING_ASSETS } from "@/lib/branding";
 
 export default function NavigationBar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Track mobile menu state
@@ -20,7 +21,7 @@ export default function NavigationBar() {
       {/* Logo */}
       <div className="flex justify-between items-center">
         <div className="flex-shrink-0">
-          <img src="/logolaku.svg" width={128} height={29} alt="godong.id Logo" />
+          <img src={BRANDING_ASSETS.logo} width={128} height={45} alt="KREZOEMA" className="h-10 w-auto object-contain" />
         </div>
 
         {/* Desktop Navigation Menu */}

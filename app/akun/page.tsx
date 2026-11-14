@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/krezoema/Navbar";
 import Footer from "@/components/krezoema/Footer";
 import { useAuth, CustomerAddress } from "@/context/AuthContext";
+import { cariWilayah, type WilayahEntry } from "@/lib/kodepos";
 import {
   User,
   MapPin,
@@ -19,6 +20,8 @@ import {
   X,
   AlertCircle,
   ArrowRight,
+  Search,
+  Check,
 } from "lucide-react";
 
 export default function AkunPage() {
@@ -55,17 +58,22 @@ export default function AkunPage() {
     label: "Rumah",
     nama: "",
     whatsapp: "",
-    alamat: "",
+    kodePos: "",
+    kelurahan: "",
     kecamatan: "",
     kotaKabupaten: "",
     provinsi: "",
-    kodePos: "",
+    alamat: "",
     isDefault: false,
   });
   const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [addressActionError, setAddressActionError] = useState<string | null>(null);
   const [addressActionId, setAddressActionId] = useState<string | null>(null);
+
+  // Kode Pos Lookup State
+  const [kodePosResults, setKodePosResults] = useState<WilayahEntry[]>([]);
+  const [kodePosStatus, setKodePosStatus] = useState<"idle" | "found" | "not_found" | "multiple">("idle");
 
   // Sync profile form when customer changes
   useEffect(() => {
@@ -78,6 +86,76 @@ export default function AkunPage() {
     }
   }, [customer]);
 
+  // Kode Pos auto-fill logic
+  const handleKodePosChange = (value: string) => {
+    // Only allow digits, max 5
+    const cleaned = value.replace(/\D/g, "").slice(0, 5);
+    setAddressForm((prev) => ({
+      ...prev,
+      kodePos: cleaned,
+      ...(cleaned.length < 5
+        ? { kelurahan: "", kecamatan: "", kotaKabupaten: "", provinsi: "" }
+        : {}),
+    }));
+
+    if (cleaned.length === 5) {
+      const results = cariWilayah(cleaned);
+      setKodePosResults(results);
+
+      if (results.length === 0) {
+        setKodePosStatus("not_found");
+        setAddressForm((prev) => ({
+          ...prev,
+          kelurahan: "",
+          kecamatan: "",
+          kotaKabupaten: "",
+          provinsi: "",
+        }));
+      } else if (results.length === 1) {
+        setKodePosStatus("found");
+        setAddressForm((prev) => ({
+          ...prev,
+          kelurahan: results[0].kelurahan,
+          kecamatan: results[0].kecamatan,
+          kotaKabupaten: results[0].kabupatenKota,
+          provinsi: results[0].provinsi,
+        }));
+      } else {
+        setKodePosStatus("multiple");
+        // Pre-fill kecamatan, kab/kota, provinsi jika seragam
+        const first = results[0];
+        setAddressForm((prev) => ({
+          ...prev,
+          kelurahan: "",
+          kecamatan: first.kecamatan,
+          kotaKabupaten: first.kabupatenKota,
+          provinsi: first.provinsi,
+        }));
+      }
+    } else {
+      setKodePosStatus("idle");
+      setKodePosResults([]);
+    }
+
+    if (addressErrors.kodePos) {
+      setAddressErrors((prev) => ({ ...prev, kodePos: "" }));
+    }
+  };
+
+  const handleSelectWilayah = (entry: WilayahEntry) => {
+    setAddressForm((prev) => ({
+      ...prev,
+      kelurahan: entry.kelurahan,
+      kecamatan: entry.kecamatan,
+      kotaKabupaten: entry.kabupatenKota,
+      provinsi: entry.provinsi,
+    }));
+    setKodePosStatus("found");
+    if (addressErrors.kelurahan) {
+      setAddressErrors((prev) => ({ ...prev, kelurahan: "" }));
+    }
+  };
+
   // Handle opening Add Address modal
   const handleOpenAddAddress = () => {
     setEditingAddressId(null);
@@ -85,14 +163,17 @@ export default function AkunPage() {
       label: "Rumah",
       nama: customer?.nama || "",
       whatsapp: customer?.whatsapp || "",
-      alamat: "",
+      kodePos: "",
+      kelurahan: "",
       kecamatan: "",
       kotaKabupaten: "",
       provinsi: "",
-      kodePos: "",
+      alamat: "",
       isDefault: addresses.length === 0,
     });
     setAddressErrors({});
+    setKodePosStatus("idle");
+    setKodePosResults([]);
     setIsAddressModalOpen(true);
   };
 
@@ -103,14 +184,29 @@ export default function AkunPage() {
       label: addr.label,
       nama: addr.nama,
       whatsapp: addr.whatsapp,
-      alamat: addr.alamat,
+      kodePos: addr.kodePos,
+      kelurahan: addr.kelurahan || "",
       kecamatan: addr.kecamatan,
       kotaKabupaten: addr.kotaKabupaten,
       provinsi: addr.provinsi,
-      kodePos: addr.kodePos,
+      alamat: addr.alamat,
       isDefault: addr.isDefault,
     });
     setAddressErrors({});
+    if (addr.kodePos && addr.kodePos.length === 5) {
+      const results = cariWilayah(addr.kodePos);
+      setKodePosResults(results);
+      if (results.length > 1) {
+        setKodePosStatus("multiple");
+      } else if (results.length === 1) {
+        setKodePosStatus("found");
+      } else {
+        setKodePosStatus("idle");
+      }
+    } else {
+      setKodePosStatus("idle");
+      setKodePosResults([]);
+    }
     setIsAddressModalOpen(true);
   };
 
@@ -119,14 +215,31 @@ export default function AkunPage() {
     e.preventDefault();
     const errs: Record<string, string> = {};
 
-    if (!addressForm.nama.trim()) errs.nama = "Nama penerima wajib diisi.";
-    if (!addressForm.whatsapp.trim()) errs.whatsapp = "Nomor WhatsApp wajib diisi.";
-    if (!addressForm.alamat.trim()) errs.alamat = "Alamat lengkap wajib diisi.";
-    if (!addressForm.kecamatan.trim()) errs.kecamatan = "Kecamatan wajib diisi.";
-    if (!addressForm.kotaKabupaten.trim())
-      errs.kotaKabupaten = "Kota / Kabupaten wajib diisi.";
-    if (!addressForm.provinsi.trim()) errs.provinsi = "Provinsi wajib diisi.";
-    if (!addressForm.kodePos.trim()) errs.kodePos = "Kode pos wajib diisi.";
+    if (!addressForm.kodePos.trim()) {
+      errs.kodePos = "Kode pos wajib diisi.";
+    } else if (addressForm.kodePos.length !== 5) {
+      errs.kodePos = "Kode pos harus 5 digit angka.";
+    }
+
+    if (!addressForm.provinsi.trim() || !addressForm.kotaKabupaten.trim() || !addressForm.kecamatan.trim()) {
+      errs.kodePos = errs.kodePos || "Wilayah belum ditemukan. Pastikan kode pos benar.";
+    }
+
+    if (!addressForm.kelurahan.trim()) {
+      errs.kelurahan = "Pilih salah satu kelurahan/desa untuk kode pos ini.";
+    }
+
+    if (!addressForm.alamat.trim()) {
+      errs.alamat = "Detail alamat (nama jalan, nomor rumah, RT/RW, patokan) wajib diisi.";
+    }
+
+    if (!addressForm.nama.trim()) {
+      errs.nama = "Nama penerima wajib diisi.";
+    }
+
+    if (!addressForm.whatsapp.trim()) {
+      errs.whatsapp = "Nomor WhatsApp wajib diisi.";
+    }
 
     if (Object.keys(errs).length > 0) {
       setAddressErrors(errs);
@@ -177,7 +290,6 @@ export default function AkunPage() {
   // Logout State
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Submit profile edit to backend
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profileForm.nama.trim() || !profileForm.email.trim()) return;
@@ -353,7 +465,7 @@ export default function AkunPage() {
                       Alamat Pengiriman
                     </h2>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Daftar alamat tersimpan untuk mempercepat checkout.
+                      Daftar alamat tersimpan untuk pengiriman wilayah Indonesia.
                     </p>
                   </div>
 
@@ -385,7 +497,7 @@ export default function AkunPage() {
                       Belum ada alamat tersimpan.
                     </h3>
                     <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                      Simpan alamat agar checkout berikutnya lebih cepat dan tanpa repot mengetik ulang.
+                      Simpan alamat pengiriman agar proses checkout lebih cepat.
                     </p>
                     <button
                       type="button"
@@ -436,7 +548,7 @@ export default function AkunPage() {
                             {addr.alamat}
                           </p>
                           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                            {addr.kecamatan}, {addr.kotaKabupaten}
+                            {addr.kelurahan ? `${addr.kelurahan}, ` : ""}{addr.kecamatan}, {addr.kotaKabupaten}
                           </p>
                           <p className="text-xs sm:text-sm text-muted-foreground">
                             {addr.provinsi}, {addr.kodePos}
@@ -587,9 +699,14 @@ export default function AkunPage() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl border border-border max-w-lg w-full p-6 sm:p-8 shadow-xl my-8 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-border/60">
-              <h3 className="font-sans text-lg font-bold text-foreground">
-                {editingAddressId ? "Edit Alamat" : "Tambah Alamat Baru"}
-              </h3>
+              <div>
+                <h3 className="font-sans text-lg font-bold text-foreground">
+                  {editingAddressId ? "Edit Alamat" : "Tambah Alamat Baru"}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Khusus pengiriman wilayah Indonesia
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsAddressModalOpen(false)}
@@ -600,7 +717,228 @@ export default function AkunPage() {
             </div>
 
             <form onSubmit={handleSaveAddress} className="space-y-4">
-              {/* Address Label Pills */}
+              {/* 1. FIELD KODE POS (PALING ATAS) */}
+              <div className="bg-brand-warm/60 p-4 rounded-2xl border border-border/80 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Kode Pos <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Search className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={addressForm.kodePos}
+                      onChange={(e) => handleKodePosChange(e.target.value)}
+                      placeholder="Masukkan 5 digit kode pos (cth: 60241, 10110)"
+                      maxLength={5}
+                      className={`w-full pl-9 pr-9 py-2.5 rounded-xl bg-white border text-xs sm:text-sm focus:outline-none focus:ring-2 transition-all ${
+                        kodePosStatus === "not_found"
+                          ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500"
+                          : kodePosStatus === "found" || (kodePosStatus === "multiple" && addressForm.kelurahan)
+                          ? "border-emerald-400 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          : "border-border focus:ring-brand-pink/20 focus:border-brand-pink"
+                      }`}
+                    />
+                    {(kodePosStatus === "found" || (kodePosStatus === "multiple" && addressForm.kelurahan)) && (
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      </div>
+                    )}
+                  </div>
+                  {addressErrors.kodePos && (
+                    <p className="text-rose-600 text-[11px] mt-1.5">
+                      {addressErrors.kodePos}
+                    </p>
+                  )}
+                  {kodePosStatus === "not_found" && (
+                    <p className="text-rose-600 text-[11px] mt-1.5 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Kode pos tidak ditemukan di wilayah Indonesia. Pastikan 5 digit angka yang benar.</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* 2. PILIHAN WILAYAH JIKA KODE POS MEMILIKI BEBERAPA WILAYAH */}
+                {kodePosStatus === "multiple" && kodePosResults.length > 1 && (
+                  <div className="pt-1">
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      Pilih Kelurahan / Wilayah yang Sesuai <span className="text-rose-500">*</span>
+                    </label>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      Kode pos {addressForm.kodePos} mencakup {kodePosResults.length} kelurahan/desa. Silakan pilih:
+                    </p>
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto rounded-xl border border-border p-2 bg-white">
+                      {kodePosResults.map((entry, idx) => {
+                        const isSelected =
+                          addressForm.kelurahan === entry.kelurahan &&
+                          addressForm.kecamatan === entry.kecamatan;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectWilayah(entry)}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between gap-2 ${
+                              isSelected
+                                ? "bg-brand-pink text-white font-semibold shadow-xs"
+                                : "bg-brand-warm/50 hover:bg-brand-pink-soft/40 text-foreground border border-border/40"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-semibold block">{entry.kelurahan}</span>
+                              <span className={`text-[10px] block ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
+                                Kec. {entry.kecamatan}, {entry.kabupatenKota}
+                              </span>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 shrink-0 text-white" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {addressErrors.kelurahan && (
+                      <p className="text-rose-600 text-[11px] mt-1.5">
+                        {addressErrors.kelurahan}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. FIELD WILAYAH TERISI OTOMATIS & TIDAK DAPAT DIISI BEBAS */}
+                {(addressForm.provinsi || addressForm.kotaKabupaten || addressForm.kecamatan || addressForm.kelurahan) && (
+                  <div className="pt-2 border-t border-border/60">
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-2">
+                      Data Wilayah Terisi Otomatis (Sesuai Kode Pos)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                          Provinsi
+                        </label>
+                        <input
+                          type="text"
+                          value={addressForm.provinsi}
+                          readOnly
+                          className="w-full px-3 py-1.5 rounded-lg bg-white border border-border/70 text-xs text-foreground cursor-not-allowed select-none font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                          Kabupaten / Kota
+                        </label>
+                        <input
+                          type="text"
+                          value={addressForm.kotaKabupaten}
+                          readOnly
+                          className="w-full px-3 py-1.5 rounded-lg bg-white border border-border/70 text-xs text-foreground cursor-not-allowed select-none font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                          Kecamatan
+                        </label>
+                        <input
+                          type="text"
+                          value={addressForm.kecamatan}
+                          readOnly
+                          className="w-full px-3 py-1.5 rounded-lg bg-white border border-border/70 text-xs text-foreground cursor-not-allowed select-none font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                          Kelurahan / Desa
+                        </label>
+                        <input
+                          type="text"
+                          value={addressForm.kelurahan || "(Belum dipilih)"}
+                          readOnly
+                          className={`w-full px-3 py-1.5 rounded-lg border text-xs cursor-not-allowed select-none font-medium ${
+                            addressForm.kelurahan
+                              ? "bg-white border-border/70 text-foreground"
+                              : "bg-rose-50 border-rose-200 text-rose-600 italic"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. DETAIL ALAMAT MANUAL (JALAN, NO RUMAH, RT/RW, PATOKAN) */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Detail Alamat Lengkap <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={addressForm.alamat}
+                  onChange={(e) =>
+                    setAddressForm((prev) => ({
+                      ...prev,
+                      alamat: e.target.value,
+                    }))
+                  }
+                  placeholder="Nama jalan, nomor rumah, RT/RW, nomor unit, atau patokan lokasi"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink resize-none"
+                />
+                {addressErrors.alamat && (
+                  <p className="text-rose-600 text-[11px] mt-1">
+                    {addressErrors.alamat}
+                  </p>
+                )}
+              </div>
+
+              {/* 5. NAMA PENERIMA & NOMOR TELEPON */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Nama Penerima <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={addressForm.nama}
+                    onChange={(e) =>
+                      setAddressForm((prev) => ({
+                        ...prev,
+                        nama: e.target.value,
+                      }))
+                    }
+                    placeholder="Nama lengkap penerima"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
+                  />
+                  {addressErrors.nama && (
+                    <p className="text-rose-600 text-[11px] mt-1">
+                      {addressErrors.nama}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Nomor WhatsApp / Telepon <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={addressForm.whatsapp}
+                    onChange={(e) =>
+                      setAddressForm((prev) => ({
+                        ...prev,
+                        whatsapp: e.target.value,
+                      }))
+                    }
+                    placeholder="08xxxxxxxxxx"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
+                  />
+                  {addressErrors.whatsapp && (
+                    <p className="text-rose-600 text-[11px] mt-1">
+                      {addressErrors.whatsapp}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* 6. LABEL ALAMAT & CHECKBOX DEFAULT */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1.5">
                   Label Alamat
@@ -625,180 +963,7 @@ export default function AkunPage() {
                 </div>
               </div>
 
-              {/* Nama Penerima & WA */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Nama Penerima <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.nama}
-                    onChange={(e) =>
-                      setAddressForm((prev) => ({
-                        ...prev,
-                        nama: e.target.value,
-                      }))
-                    }
-                    placeholder="Nama lengkap"
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-                  />
-                  {addressErrors.nama && (
-                    <p className="text-rose-600 text-[11px] mt-1">
-                      {addressErrors.nama}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Nomor WhatsApp <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={addressForm.whatsapp}
-                    onChange={(e) =>
-                      setAddressForm((prev) => ({
-                        ...prev,
-                        whatsapp: e.target.value,
-                      }))
-                    }
-                    placeholder="08xxxxxxxxxx"
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-                  />
-                  {addressErrors.whatsapp && (
-                    <p className="text-rose-600 text-[11px] mt-1">
-                      {addressErrors.whatsapp}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Alamat Lengkap */}
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Alamat Lengkap <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={addressForm.alamat}
-                  onChange={(e) =>
-                    setAddressForm((prev) => ({
-                      ...prev,
-                      alamat: e.target.value,
-                    }))
-                  }
-                  placeholder="Nama jalan, nomor rumah, RT/RW, detail lainnya"
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink resize-none"
-                />
-                {addressErrors.alamat && (
-                  <p className="text-rose-600 text-[11px] mt-1">
-                    {addressErrors.alamat}
-                  </p>
-                )}
-              </div>
-
-              {/* Kecamatan & Kota */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Kecamatan <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.kecamatan}
-                    onChange={(e) =>
-                      setAddressForm((prev) => ({
-                        ...prev,
-                        kecamatan: e.target.value,
-                      }))
-                    }
-                    placeholder="Kecamatan"
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-                  />
-                  {addressErrors.kecamatan && (
-                    <p className="text-rose-600 text-[11px] mt-1">
-                      {addressErrors.kecamatan}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Kota / Kabupaten <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.kotaKabupaten}
-                    onChange={(e) =>
-                      setAddressForm((prev) => ({
-                        ...prev,
-                        kotaKabupaten: e.target.value,
-                      }))
-                    }
-                    placeholder="Kota atau kabupaten"
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-                  />
-                  {addressErrors.kotaKabupaten && (
-                    <p className="text-rose-600 text-[11px] mt-1">
-                      {addressErrors.kotaKabupaten}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Provinsi & Kode Pos */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Provinsi <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressForm.provinsi}
-                    onChange={(e) =>
-                      setAddressForm((prev) => ({
-                        ...prev,
-                        provinsi: e.target.value,
-                      }))
-                    }
-                    placeholder="Provinsi"
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-                  />
-                  {addressErrors.provinsi && (
-                    <p className="text-rose-600 text-[11px] mt-1">
-                      {addressErrors.provinsi}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Kode Pos <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={addressForm.kodePos}
-                    onChange={(e) =>
-                      setAddressForm((prev) => ({
-                        ...prev,
-                        kodePos: e.target.value,
-                      }))
-                    }
-                    placeholder="12345"
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
-                  />
-                  {addressErrors.kodePos && (
-                    <p className="text-rose-600 text-[11px] mt-1">
-                      {addressErrors.kodePos}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Checkbox Set Default */}
-              <div className="pt-2">
+              <div className="pt-1">
                 <label className="flex items-center gap-2 cursor-pointer text-xs sm:text-sm text-foreground">
                   <input
                     type="checkbox"
@@ -815,7 +980,7 @@ export default function AkunPage() {
                 </label>
               </div>
 
-              {/* Actions */}
+              {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-border/60">
                 <button
                   type="button"

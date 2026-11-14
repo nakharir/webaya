@@ -1,6 +1,9 @@
 // ============================================================================
+
 // KREZOEMA — Stage 13A & 13C: Ecommerce API Types
+
 // Types matching the Laravel backend API response structure.
+
 // ============================================================================
 
 // --- Category ---
@@ -106,7 +109,9 @@ export interface ProductListParams {
 }
 
 // ============================================================================
+
 // Stage 13C: Customer Authentication Types
+
 // ============================================================================
 
 export interface ApiCustomer {
@@ -141,7 +146,9 @@ export interface CustomerAuthResponse {
 }
 
 // ============================================================================
+
 // Stage 13D: Customer Address Types
+
 // ============================================================================
 
 export interface ApiCustomerAddress {
@@ -151,6 +158,7 @@ export interface ApiCustomerAddress {
   recipient_name: string;
   whatsapp: string;
   address: string;
+  village?: string;
   district: string;
   city: string;
   province: string;
@@ -165,6 +173,7 @@ export interface CustomerAddressPayload {
   recipient_name: string;
   whatsapp: string;
   address: string;
+  village?: string;
   district: string;
   city: string;
   province: string;
@@ -173,14 +182,39 @@ export interface CustomerAddressPayload {
 }
 
 // ============================================================================
+
+export interface ShippingRateOption {
+  courier: string;
+  courier_name: string;
+  service_code: string;
+  service_name: string;
+  shipping_method: string;
+  cost: number;
+  etd: string;
+  total_weight: number;
+  weight_kg: number;
+}
+
+export interface CalculateShippingResponse {
+  destination: {
+    province: string;
+    city: string | null;
+  };
+  total_weight: number;
+  weight_kg: number;
+  rates: ShippingRateOption[];
+}
+
 // Stage 13E: Checkout preparation types (no order API is called yet)
+
 // ============================================================================
 
-export type CheckoutShippingMethod = "jnt" | "jne";
-
+export type CheckoutShippingMethod = "jnt" | "jne" | string;
 export interface CheckoutState {
   addressId: number | null;
   shippingMethod: CheckoutShippingMethod | null;
+  shippingCourier?: string | null;
+  shippingService?: string | null;
   notes: string;
 }
 
@@ -192,13 +226,18 @@ export interface PreparedCheckoutItem {
 
 export interface PreparedCheckoutPayload {
   address_id: number;
-  shipping_method: CheckoutShippingMethod;
+  shipping_method?: string;
+  shipping_courier?: string;
+  shipping_service?: string;
+  payment_method?: string;
   notes: string | null;
   items: PreparedCheckoutItem[];
 }
 
 // ============================================================================
+
 // Stage 14: Order Types
+
 // ============================================================================
 
 export type OrderStatus =
@@ -208,13 +247,11 @@ export type OrderStatus =
   | "shipped"
   | "completed"
   | "cancelled";
-
 export type PaymentStatus =
   | "unpaid"
   | "waiting_verification"
   | "paid"
   | "rejected";
-
 export interface ApiOrderPaymentDetails {
   bank_name: string;
   account_number: string;
@@ -246,6 +283,12 @@ export interface ApiOrder {
   payment_method?: string;
   payment_details?: ApiOrderPaymentDetails;
   shipping_method: string;
+  shipping_courier?: string;
+  shipping_service?: string;
+  shipping_etd?: string;
+  total_weight?: number;
+  total_weight_kg?: number;
+  tracking_number?: string | null;
   shipping_name: string;
   shipping_whatsapp: string;
   shipping_address: string;
