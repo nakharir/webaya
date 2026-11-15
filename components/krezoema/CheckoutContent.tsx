@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import type { CheckoutShippingMethod, CheckoutState, PreparedCheckoutPayload, ApiOrder, ShippingRateOption } from "@/lib/api/types";
+import type {
+  CheckoutShippingMethod,
+  CheckoutState,
+  PreparedCheckoutPayload,
+  ApiOrder,
+  ShippingRateOption,
+} from "@/lib/api/types";
 import { createOrder, calculateShippingRates } from "@/lib/api/ecommerce";
 import { cariWilayah, type WilayahEntry } from "@/lib/kodepos";
 import { TransferProofUpload } from "@/components/krezoema/TransferProofUpload";
@@ -127,17 +133,24 @@ export default function CheckoutContent() {
 
   // Stage 15: Shipping Rates State
   const [shippingRates, setShippingRates] = useState<ShippingRateOption[]>([]);
-  const [selectedRate, setSelectedRate] = useState<ShippingRateOption | null>(null);
+  const [selectedRate, setSelectedRate] = useState<ShippingRateOption | null>(
+    null,
+  );
   const [isLoadingShipping, setIsLoadingShipping] = useState<boolean>(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
-  const [packageWeight, setPackageWeight] = useState<{ total_weight: number; weight_kg: number } | null>(null);
+  const [packageWeight, setPackageWeight] = useState<{
+    total_weight: number;
+    weight_kg: number;
+  } | null>(null);
 
   // Initialize form with saved address if customer is logged in
   useEffect(() => {
     if (!isAuthHydrated) return;
 
     if (isLoggedIn && addresses.length > 0) {
-      const selected = addresses.find((address) => address.id === selectedAddressId);
+      const selected = addresses.find(
+        (address) => address.id === selectedAddressId,
+      );
       const initial = selected || defaultAddress || addresses[0];
       if (!selected) setSelectedAddressId(initial.id);
       setFormData((prev) => ({
@@ -159,7 +172,14 @@ export default function CheckoutContent() {
         whatsapp: prev.whatsapp || customer.whatsapp,
       }));
     }
-  }, [isLoggedIn, isAuthHydrated, addresses, defaultAddress, customer, selectedAddressId]);
+  }, [
+    isLoggedIn,
+    isAuthHydrated,
+    addresses,
+    defaultAddress,
+    customer,
+    selectedAddressId,
+  ]);
 
   // Sync formData when selecting an address
   const handleSelectSavedAddress = (addrId: string) => {
@@ -188,8 +208,12 @@ export default function CheckoutContent() {
     }
 
     const addressIdNum = Number(selectedAddressId);
-    const hasAddressId = Boolean(selectedAddressId && Number.isInteger(addressIdNum) && addressIdNum > 0);
-    const hasProvince = Boolean(formData.provinsi && formData.provinsi.trim().length > 0);
+    const hasAddressId = Boolean(
+      selectedAddressId && Number.isInteger(addressIdNum) && addressIdNum > 0,
+    );
+    const hasProvince = Boolean(
+      formData.provinsi && formData.provinsi.trim().length > 0,
+    );
 
     if (!hasAddressId && !hasProvince) {
       setShippingRates([]);
@@ -210,7 +234,11 @@ export default function CheckoutContent() {
           address_id?: number;
           province?: string;
           city?: string;
-          items: { product_id: number; variant_id?: number | null; quantity: number }[];
+          items: {
+            product_id: number;
+            variant_id?: number | null;
+            quantity: number;
+          }[];
         } = {
           items: items.map((item) => ({
             product_id: Number(item.product.id),
@@ -232,7 +260,50 @@ export default function CheckoutContent() {
 
         if (isCancelled) return;
 
-        const rates = result.rates || [];
+        const rawRates = result.rates || [];
+
+        // Filter and map available rates strictly to allowed couriers:
+        // 1. JNE Express — REG (Regular)
+        // 2. J&T Express — EZ (Reguler)
+        // Eliminating SiCepat and duplicate services.
+        const filteredRates: ShippingRateOption[] = [];
+
+        // 1. JNE Express — REG (Regular)
+        const jneCandidate = rawRates.find(
+          (r) =>
+            r.courier.toLowerCase() === "jne" &&
+            (r.service_code.toLowerCase() === "reg" ||
+              !r.service_code.toLowerCase().includes("yes")),
+        );
+        if (jneCandidate) {
+          filteredRates.push({
+            ...jneCandidate,
+            courier: "jne",
+            courier_name: "JNE Express",
+            service_code: "REG",
+            service_name: "REG (Regular)",
+            shipping_method: "JNE Express — REG (Regular)",
+          });
+        }
+
+        // 2. J&T Express — EZ (Reguler)
+        const jntCandidate = rawRates.find(
+          (r) =>
+            r.courier.toLowerCase() === "jnt" ||
+            r.courier.toLowerCase() === "j&t",
+        );
+        if (jntCandidate) {
+          filteredRates.push({
+            ...jntCandidate,
+            courier: "jnt",
+            courier_name: "J&T Express",
+            service_code: "EZ",
+            service_name: "EZ (Reguler)",
+            shipping_method: "J&T Express — EZ (Reguler)",
+          });
+        }
+
+        const rates = filteredRates;
         setShippingRates(rates);
         setPackageWeight({
           total_weight: result.total_weight,
@@ -243,22 +314,31 @@ export default function CheckoutContent() {
           setSelectedRate(null);
           setFormData((prev) => ({ ...prev, metodePengiriman: "" }));
           setShippingError(
-            `Tidak ada pilihan kurir pengiriman untuk tujuan "${result.destination?.province || formData.provinsi}". Silakan hubungi admin.`
+            `Tidak ada pilihan kurir pengiriman untuk tujuan "${result.destination?.province || formData.provinsi}". Silakan hubungi admin.`,
           );
         } else {
-          // Keep existing selection if it still matches, otherwise select first rate option
+          // Keep existing selection if it still matches, otherwise select first rate option (JNE Express — REG)
           setSelectedRate((prev) => {
             if (prev) {
               const stillValid = rates.find(
-                (r) => r.courier === prev.courier && r.service_code === prev.service_code
+                (r) =>
+                  r.courier.toLowerCase() === prev.courier.toLowerCase() &&
+                  r.service_code.toLowerCase() ===
+                    prev.service_code.toLowerCase(),
               );
               if (stillValid) {
-                setFormData((f) => ({ ...f, metodePengiriman: stillValid.shipping_method }));
+                setFormData((f) => ({
+                  ...f,
+                  metodePengiriman: stillValid.shipping_method,
+                }));
                 return stillValid;
               }
             }
             const first = rates[0];
-            setFormData((f) => ({ ...f, metodePengiriman: first.shipping_method }));
+            setFormData((f) => ({
+              ...f,
+              metodePengiriman: first.shipping_method,
+            }));
             return first;
           });
           setShippingError(null);
@@ -306,7 +386,7 @@ export default function CheckoutContent() {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -324,7 +404,9 @@ export default function CheckoutContent() {
 
   const validateForm = (): { isValid: boolean; firstKey?: string } => {
     const newErrors: FormErrors = {};
-    const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
+    const selectedAddress = addresses.find(
+      (address) => address.id === selectedAddressId,
+    );
 
     if (!selectedAddress) {
       setCheckoutError("Pilih alamat pengiriman terlebih dahulu.");
@@ -368,22 +450,39 @@ export default function CheckoutContent() {
 
     setErrors(newErrors);
     const keys = Object.keys(newErrors);
-    return { isValid: keys.length === 0 && !!selectedAddress && !!selectedRate, firstKey: keys[0] };
+    return {
+      isValid: keys.length === 0 && !!selectedAddress && !!selectedRate,
+      firstKey: keys[0],
+    };
   };
 
-  const shippingLabel = (method: CheckoutShippingMethod | "") =>
-    method === "jnt" ? "J&T" : method === "jne" ? "JNE" : "Belum dipilih";
+  const shippingLabel = (method: CheckoutShippingMethod | "") => {
+    if (!method) return "Belum dipilih";
+    const m = method.toLowerCase();
+    if (m.includes("jne")) return "JNE Express — REG (Regular)";
+    if (m.includes("jnt") || m.includes("j&t"))
+      return "J&T Express — EZ (Reguler)";
+    return method;
+  };
 
   const checkoutState = useMemo<CheckoutState>(() => {
     const addressId = Number(selectedAddressId);
     return {
-      addressId: Number.isInteger(addressId) && addressId > 0 ? addressId : null,
-      shippingMethod: selectedRate ? selectedRate.shipping_method : formData.metodePengiriman || null,
+      addressId:
+        Number.isInteger(addressId) && addressId > 0 ? addressId : null,
+      shippingMethod: selectedRate
+        ? selectedRate.shipping_method
+        : formData.metodePengiriman || null,
       shippingCourier: selectedRate ? selectedRate.courier : null,
       shippingService: selectedRate ? selectedRate.service_code : null,
       notes: formData.catatan,
     };
-  }, [selectedAddressId, selectedRate, formData.metodePengiriman, formData.catatan]);
+  }, [
+    selectedAddressId,
+    selectedRate,
+    formData.metodePengiriman,
+    formData.catatan,
+  ]);
 
   const preparedPayload = useMemo<PreparedCheckoutPayload | null>(() => {
     if (!checkoutState.addressId || !checkoutState.shippingMethod) return null;
@@ -458,8 +557,14 @@ export default function CheckoutContent() {
       setNewAddressError("Kode pos harus 5 digit angka.");
       return;
     }
-    if (!newAddrForm.provinsi.trim() || !newAddrForm.kotaKabupaten.trim() || !newAddrForm.kecamatan.trim()) {
-      setNewAddressError("Data wilayah belum ditemukan. Pastikan kode pos benar.");
+    if (
+      !newAddrForm.provinsi.trim() ||
+      !newAddrForm.kotaKabupaten.trim() ||
+      !newAddrForm.kecamatan.trim()
+    ) {
+      setNewAddressError(
+        "Data wilayah belum ditemukan. Pastikan kode pos benar.",
+      );
       return;
     }
     if (!newAddrForm.kelurahan.trim()) {
@@ -511,7 +616,10 @@ export default function CheckoutContent() {
 
       setIsAddressModalOpen(false);
     } catch (error: any) {
-      setNewAddressError(error?.response?.data?.message || "Gagal menyimpan alamat. Silakan coba lagi.");
+      setNewAddressError(
+        error?.response?.data?.message ||
+          "Gagal menyimpan alamat. Silakan coba lagi.",
+      );
     } finally {
       setIsSavingNewAddress(false);
     }
@@ -553,7 +661,8 @@ export default function CheckoutContent() {
               Keranjangmu masih kosong
             </h2>
             <p className="font-sans text-sm text-muted-foreground leading-relaxed mb-8">
-              Tambahkan material terlebih dahulu sebelum melanjutkan ke checkout.
+              Tambahkan material terlebih dahulu sebelum melanjutkan ke
+              checkout.
             </p>
 
             <Link
@@ -605,8 +714,10 @@ export default function CheckoutContent() {
     };
 
     const bankName = createdOrder.payment_details?.bank_name || "BCA";
-    const accountNumber = createdOrder.payment_details?.account_number || "8290123456";
-    const accountHolder = createdOrder.payment_details?.account_holder || "KREZOEMA CRAFT";
+    const accountNumber =
+      createdOrder.payment_details?.account_number || "8290123456";
+    const accountHolder =
+      createdOrder.payment_details?.account_holder || "KREZOEMA CRAFT";
     const expiresAt = createdOrder.payment_details?.expires_at;
 
     return (
@@ -627,7 +738,8 @@ export default function CheckoutContent() {
             </h1>
 
             <p className="font-sans text-sm text-muted-foreground leading-relaxed max-w-lg mx-auto mb-6">
-              Pesanan telah tercatat di sistem KREZOEMA. Silakan lakukan pembayaran transfer sesuai panduan di bawah.
+              Pesanan telah tercatat di sistem KREZOEMA. Silakan lakukan
+              pembayaran transfer sesuai panduan di bawah.
             </p>
 
             {/* Order Number Highlight Card */}
@@ -693,7 +805,9 @@ export default function CheckoutContent() {
               {/* Destination Bank Account Info */}
               <div className="space-y-3 bg-brand-warm rounded-2xl p-4 border border-border/60 mb-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground font-medium">Bank Tujuan</span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Bank Tujuan
+                  </span>
                   <span className="text-xs font-bold text-foreground bg-white px-2.5 py-0.5 rounded-md border border-border/80">
                     {bankName}
                   </span>
@@ -701,7 +815,9 @@ export default function CheckoutContent() {
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-muted-foreground font-medium block">Nomor Rekening</span>
+                    <span className="text-xs text-muted-foreground font-medium block">
+                      Nomor Rekening
+                    </span>
                     <span className="font-mono text-base font-bold text-foreground">
                       {accountNumber}
                     </span>
@@ -714,7 +830,9 @@ export default function CheckoutContent() {
                     {isAccountCopied ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-600 font-semibold">Tersalin</span>
+                        <span className="text-emerald-600 font-semibold">
+                          Tersalin
+                        </span>
                       </>
                     ) : (
                       <>
@@ -726,7 +844,9 @@ export default function CheckoutContent() {
                 </div>
 
                 <div className="flex items-center justify-between border-t border-border/40 pt-2">
-                  <span className="text-xs text-muted-foreground font-medium">Nama Pemilik Rekening</span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Nama Pemilik Rekening
+                  </span>
                   <span className="text-xs font-semibold text-foreground">
                     {accountHolder}
                   </span>
@@ -751,7 +871,9 @@ export default function CheckoutContent() {
                   {isTotalCopied ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-600 font-semibold">Tersalin</span>
+                      <span className="text-emerald-600 font-semibold">
+                        Tersalin
+                      </span>
                     </>
                   ) : (
                     <>
@@ -767,7 +889,8 @@ export default function CheckoutContent() {
                 <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50/80 border border-amber-200/80 rounded-xl px-3.5 py-2.5 mb-4">
                   <Clock className="w-4 h-4 shrink-0 text-amber-600" />
                   <span>
-                    Batas Waktu Pembayaran: <strong>{formatDeadline(expiresAt)}</strong>
+                    Batas Waktu Pembayaran:{" "}
+                    <strong>{formatDeadline(expiresAt)}</strong>
                   </span>
                 </div>
               )}
@@ -786,32 +909,51 @@ export default function CheckoutContent() {
                   Informasi Pengiriman
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                  {createdOrder.status === "pending" ? "Menunggu Konfirmasi" : createdOrder.status}
+                  {createdOrder.status === "pending"
+                    ? "Menunggu Konfirmasi"
+                    : createdOrder.status}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Nama Penerima</span>
-                  <span className="font-medium text-foreground">{createdOrder.shipping_name}</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Nama Penerima
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {createdOrder.shipping_name}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Nomor WhatsApp</span>
-                  <span className="font-medium text-foreground">{createdOrder.shipping_whatsapp}</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Nomor WhatsApp
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {createdOrder.shipping_whatsapp}
+                  </span>
                 </div>
                 <div className="sm:col-span-2">
-                  <span className="text-muted-foreground block text-[11px]">Alamat Pengiriman</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Alamat Pengiriman
+                  </span>
                   <span className="font-medium text-foreground leading-snug block">
-                    {createdOrder.shipping_address}, {createdOrder.shipping_kecamatan},{" "}
-                    {createdOrder.shipping_city}, {createdOrder.shipping_province}{" "}
+                    {createdOrder.shipping_address},{" "}
+                    {createdOrder.shipping_kecamatan},{" "}
+                    {createdOrder.shipping_city},{" "}
+                    {createdOrder.shipping_province}{" "}
                     {createdOrder.shipping_postal_code}
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Kurir & Pengiriman</span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Kurir & Pengiriman
+                  </span>
                   <span className="font-medium text-foreground">
-                    {createdOrder.shipping_courier || createdOrder.shipping_method}
-                    {createdOrder.shipping_service ? ` (${createdOrder.shipping_service})` : ""}
+                    {createdOrder.shipping_courier ||
+                      createdOrder.shipping_method}
+                    {createdOrder.shipping_service
+                      ? ` (${createdOrder.shipping_service})`
+                      : ""}
                   </span>
                   {createdOrder.shipping_etd && (
                     <span className="text-[11px] text-muted-foreground block">
@@ -821,15 +963,22 @@ export default function CheckoutContent() {
                 </div>
                 {Boolean(createdOrder.total_weight) && (
                   <div>
-                    <span className="text-muted-foreground block text-[11px]">Total Berat Paket</span>
+                    <span className="text-muted-foreground block text-[11px]">
+                      Total Berat Paket
+                    </span>
                     <span className="font-medium text-foreground">
-                      {createdOrder.total_weight}g (~{createdOrder.total_weight_kg || Math.ceil((createdOrder.total_weight || 0) / 1000)} kg)
+                      {createdOrder.total_weight}g (~
+                      {createdOrder.total_weight_kg ||
+                        Math.ceil((createdOrder.total_weight || 0) / 1000)}{" "}
+                      kg)
                     </span>
                   </div>
                 )}
                 {createdOrder.notes && (
                   <div className="sm:col-span-2 pt-1 border-t border-border/40">
-                    <span className="text-muted-foreground block text-[11px]">Catatan</span>
+                    <span className="text-muted-foreground block text-[11px]">
+                      Catatan
+                    </span>
                     <span className="font-normal text-muted-foreground italic text-xs">
                       &ldquo;{createdOrder.notes}&rdquo;
                     </span>
@@ -843,7 +992,10 @@ export default function CheckoutContent() {
                   Item Pesanan
                 </span>
                 {createdOrder.items?.map((item) => (
-                  <div key={item.id} className="flex justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0">
+                  <div
+                    key={item.id}
+                    className="flex justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0"
+                  >
                     <div>
                       <span className="font-medium text-foreground block">
                         {item.product_name}
@@ -871,11 +1023,17 @@ export default function CheckoutContent() {
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Biaya Pengiriman</span>
-                    <span>{createdOrder.shipping_cost > 0 ? formatRupiah(createdOrder.shipping_cost) : "Gratis"}</span>
+                    <span>
+                      {createdOrder.shipping_cost > 0
+                        ? formatRupiah(createdOrder.shipping_cost)
+                        : "Gratis"}
+                    </span>
                   </div>
                   <div className="flex justify-between border-t border-border/40 pt-2 text-sm font-bold text-foreground">
                     <span>Total Pembayaran</span>
-                    <span className="text-brand-pink-dark font-mono">{formatRupiah(createdOrder.total)}</span>
+                    <span className="text-brand-pink-dark font-mono">
+                      {formatRupiah(createdOrder.total)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -919,7 +1077,8 @@ export default function CheckoutContent() {
               Lengkapi Pesananmu
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Pilih alamat tersimpan atau isi alamat baru untuk pengiriman pesanan.
+              Pilih alamat tersimpan atau isi alamat baru untuk pengiriman
+              pesanan.
             </p>
           </div>
 
@@ -935,7 +1094,8 @@ export default function CheckoutContent() {
         {/* Customer Account Status */}
         <div className="mb-8 p-4 rounded-2xl bg-brand-pink-soft/30 border border-brand-pink/20 flex items-center justify-between text-xs">
           <span className="text-brand-pink-dark">
-            Checkout sebagai: <strong>{customer?.nama}</strong> ({customer?.email || customer?.whatsapp})
+            Checkout sebagai: <strong>{customer?.nama}</strong> (
+            {customer?.email || customer?.whatsapp})
           </span>
           <Link
             href="/akun"
@@ -950,7 +1110,6 @@ export default function CheckoutContent() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
             {/* Left Column (2/3 on Desktop): Shipping Details */}
             <div className="lg:col-span-8 w-full space-y-8">
-              
               {/* SECTION 1: SAVED ADDRESS SELECTOR (If logged in & addresses exist) */}
               {isLoggedIn && addresses.length > 0 && (
                 <div className="rounded-3xl bg-white border border-border/80 p-6 sm:p-8 shadow-sm">
@@ -1027,30 +1186,42 @@ export default function CheckoutContent() {
                               </span>
                             </p>
                             <p className="text-xs text-foreground/80 leading-relaxed mt-1">
-                              {addr.alamat}, {addr.kelurahan ? `${addr.kelurahan}, ` : ""}{addr.kecamatan}, {addr.kotaKabupaten},{" "}
+                              {addr.alamat},{" "}
+                              {addr.kelurahan ? `${addr.kelurahan}, ` : ""}
+                              {addr.kecamatan}, {addr.kotaKabupaten},{" "}
                               {addr.provinsi} {addr.kodePos}
                             </p>
                           </div>
                         </label>
                       );
                     })}
-
                   </div>
                 </div>
               )}
 
               {isLoggedIn && !isAddressesLoading && addresses.length === 0 && (
                 <div className="rounded-3xl bg-white border border-border/80 p-6 sm:p-8">
-                  <h2 className="font-sans text-lg font-bold text-foreground">Belum ada alamat pengiriman.</h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 mb-4">Tambahkan alamat agar dapat dipilih untuk checkout berikutnya.</p>
-                  <button type="button" onClick={handleOpenAddAddressModal} className="inline-flex items-center gap-2 rounded-full bg-brand-pink px-4 py-2 text-xs font-semibold text-white hover:bg-brand-pink-dark">
+                  <h2 className="font-sans text-lg font-bold text-foreground">
+                    Belum ada alamat pengiriman.
+                  </h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 mb-4">
+                    Tambahkan alamat agar dapat dipilih untuk checkout
+                    berikutnya.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddAddressModal}
+                    className="inline-flex items-center gap-2 rounded-full bg-brand-pink px-4 py-2 text-xs font-semibold text-white hover:bg-brand-pink-dark"
+                  >
                     <Plus className="w-4 h-4" /> Tambah Alamat
                   </button>
                 </div>
               )}
 
               {(isAddressesLoading || addressError) && (
-                <p className={`text-xs ${addressError ? "text-rose-600" : "text-muted-foreground"}`}>
+                <p
+                  className={`text-xs ${addressError ? "text-rose-600" : "text-muted-foreground"}`}
+                >
                   {addressError || "Memuat alamat tersimpan..."}
                 </p>
               )}
@@ -1058,14 +1229,20 @@ export default function CheckoutContent() {
               {/* SECTION 2: Selected address details */}
               <div className="rounded-3xl bg-white border border-border/80 p-6 sm:p-8 shadow-sm">
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="font-sans text-lg sm:text-xl font-bold text-foreground">Detail Alamat Terpilih</h2>
+                  <h2 className="font-sans text-lg sm:text-xl font-bold text-foreground">
+                    Detail Alamat Terpilih
+                  </h2>
                 </div>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-6">
-                  Pilih atau tambahkan alamat dari buku alamatmu. Detail di bawah mengikuti alamat yang dipilih.
+                  Pilih atau tambahkan alamat dari buku alamatmu. Detail di
+                  bawah mengikuti alamat yang dipilih.
                 </p>
 
                 {checkoutError && (
-                  <p className="mb-4 flex items-center gap-1 text-xs font-medium text-rose-600" role="alert">
+                  <p
+                    className="mb-4 flex items-center gap-1 text-xs font-medium text-rose-600"
+                    role="alert"
+                  >
                     <AlertCircle className="h-3.5 w-3.5" /> {checkoutError}
                   </p>
                 )}
@@ -1096,7 +1273,10 @@ export default function CheckoutContent() {
                       }`}
                     />
                     {errors.nama && (
-                      <p id="error-nama" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                      <p
+                        id="error-nama"
+                        className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                      >
                         <AlertCircle className="w-3.5 h-3.5" />
                         <span>{errors.nama}</span>
                       </p>
@@ -1120,7 +1300,9 @@ export default function CheckoutContent() {
                       placeholder="08xxxxxxxxxx"
                       aria-required="true"
                       aria-invalid={!!errors.whatsapp}
-                      aria-describedby={errors.whatsapp ? "error-whatsapp" : undefined}
+                      aria-describedby={
+                        errors.whatsapp ? "error-whatsapp" : undefined
+                      }
                       className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-white border text-foreground placeholder:text-muted-foreground/60 text-sm transition-all focus:outline-none focus:ring-2 ${
                         errors.whatsapp
                           ? "border-rose-500 focus:ring-rose-500/20"
@@ -1128,7 +1310,10 @@ export default function CheckoutContent() {
                       }`}
                     />
                     {errors.whatsapp && (
-                      <p id="error-whatsapp" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                      <p
+                        id="error-whatsapp"
+                        className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                      >
                         <AlertCircle className="w-3.5 h-3.5" />
                         <span>{errors.whatsapp}</span>
                       </p>
@@ -1152,7 +1337,9 @@ export default function CheckoutContent() {
                       placeholder="Nama jalan, nomor rumah, RT/RW, atau detail alamat lainnya"
                       aria-required="true"
                       aria-invalid={!!errors.alamat}
-                      aria-describedby={errors.alamat ? "error-alamat" : undefined}
+                      aria-describedby={
+                        errors.alamat ? "error-alamat" : undefined
+                      }
                       className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-white border text-foreground placeholder:text-muted-foreground/60 text-sm transition-all focus:outline-none focus:ring-2 resize-none ${
                         errors.alamat
                           ? "border-rose-500 focus:ring-rose-500/20"
@@ -1160,7 +1347,10 @@ export default function CheckoutContent() {
                       }`}
                     />
                     {errors.alamat && (
-                      <p id="error-alamat" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                      <p
+                        id="error-alamat"
+                        className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                      >
                         <AlertCircle className="w-3.5 h-3.5" />
                         <span>{errors.alamat}</span>
                       </p>
@@ -1174,7 +1364,8 @@ export default function CheckoutContent() {
                         htmlFor="kelurahan"
                         className="block text-xs sm:text-sm font-semibold text-foreground mb-1.5"
                       >
-                        Kelurahan / Desa <span className="text-rose-500">*</span>
+                        Kelurahan / Desa{" "}
+                        <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1197,12 +1388,14 @@ export default function CheckoutContent() {
                         type="text"
                         id="kecamatan"
                         name="kecamatan"
-                      value={formData.kecamatan}
-                      readOnly
+                        value={formData.kecamatan}
+                        readOnly
                         placeholder="Masukkan kecamatan"
                         aria-required="true"
                         aria-invalid={!!errors.kecamatan}
-                        aria-describedby={errors.kecamatan ? "error-kecamatan" : undefined}
+                        aria-describedby={
+                          errors.kecamatan ? "error-kecamatan" : undefined
+                        }
                         className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-white border text-foreground placeholder:text-muted-foreground/60 text-sm transition-all focus:outline-none focus:ring-2 ${
                           errors.kecamatan
                             ? "border-rose-500 focus:ring-rose-500/20"
@@ -1210,7 +1403,10 @@ export default function CheckoutContent() {
                         }`}
                       />
                       {errors.kecamatan && (
-                        <p id="error-kecamatan" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <p
+                          id="error-kecamatan"
+                          className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                        >
                           <AlertCircle className="w-3.5 h-3.5" />
                           <span>{errors.kecamatan}</span>
                         </p>
@@ -1222,18 +1418,21 @@ export default function CheckoutContent() {
                         htmlFor="kota"
                         className="block text-xs sm:text-sm font-semibold text-foreground mb-1.5"
                       >
-                        Kota / Kabupaten <span className="text-rose-500">*</span>
+                        Kota / Kabupaten{" "}
+                        <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"
                         id="kota"
                         name="kota"
-                      value={formData.kota}
-                      readOnly
+                        value={formData.kota}
+                        readOnly
                         placeholder="Masukkan kota atau kabupaten"
                         aria-required="true"
                         aria-invalid={!!errors.kota}
-                        aria-describedby={errors.kota ? "error-kota" : undefined}
+                        aria-describedby={
+                          errors.kota ? "error-kota" : undefined
+                        }
                         className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-white border text-foreground placeholder:text-muted-foreground/60 text-sm transition-all focus:outline-none focus:ring-2 ${
                           errors.kota
                             ? "border-rose-500 focus:ring-rose-500/20"
@@ -1241,7 +1440,10 @@ export default function CheckoutContent() {
                         }`}
                       />
                       {errors.kota && (
-                        <p id="error-kota" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <p
+                          id="error-kota"
+                          className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                        >
                           <AlertCircle className="w-3.5 h-3.5" />
                           <span>{errors.kota}</span>
                         </p>
@@ -1262,12 +1464,14 @@ export default function CheckoutContent() {
                         type="text"
                         id="provinsi"
                         name="provinsi"
-                      value={formData.provinsi}
-                      readOnly
+                        value={formData.provinsi}
+                        readOnly
                         placeholder="Masukkan provinsi"
                         aria-required="true"
                         aria-invalid={!!errors.provinsi}
-                        aria-describedby={errors.provinsi ? "error-provinsi" : undefined}
+                        aria-describedby={
+                          errors.provinsi ? "error-provinsi" : undefined
+                        }
                         className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-white border text-foreground placeholder:text-muted-foreground/60 text-sm transition-all focus:outline-none focus:ring-2 ${
                           errors.provinsi
                             ? "border-rose-500 focus:ring-rose-500/20"
@@ -1275,7 +1479,10 @@ export default function CheckoutContent() {
                         }`}
                       />
                       {errors.provinsi && (
-                        <p id="error-provinsi" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <p
+                          id="error-provinsi"
+                          className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                        >
                           <AlertCircle className="w-3.5 h-3.5" />
                           <span>{errors.provinsi}</span>
                         </p>
@@ -1294,12 +1501,14 @@ export default function CheckoutContent() {
                         id="kodePos"
                         name="kodePos"
                         inputMode="numeric"
-                      value={formData.kodePos}
-                      readOnly
+                        value={formData.kodePos}
+                        readOnly
                         placeholder="12345"
                         aria-required="true"
                         aria-invalid={!!errors.kodePos}
-                        aria-describedby={errors.kodePos ? "error-kodePos" : undefined}
+                        aria-describedby={
+                          errors.kodePos ? "error-kodePos" : undefined
+                        }
                         className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-white border text-foreground placeholder:text-muted-foreground/60 text-sm transition-all focus:outline-none focus:ring-2 ${
                           errors.kodePos
                             ? "border-rose-500 focus:ring-rose-500/20"
@@ -1307,7 +1516,10 @@ export default function CheckoutContent() {
                         }`}
                       />
                       {errors.kodePos && (
-                        <p id="error-kodePos" className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <p
+                          id="error-kodePos"
+                          className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1"
+                        >
                           <AlertCircle className="w-3.5 h-3.5" />
                           <span>{errors.kodePos}</span>
                         </p>
@@ -1352,18 +1564,23 @@ export default function CheckoutContent() {
                   </div>
                   {packageWeight && (
                     <span className="text-xs bg-brand-pink-soft text-brand-pink-dark px-2.5 py-0.5 rounded-full font-medium">
-                      Berat Total: {packageWeight.total_weight}g (~{packageWeight.weight_kg} kg)
+                      Berat Total: {packageWeight.total_weight}g (~
+                      {packageWeight.weight_kg} kg)
                     </span>
                   )}
                 </div>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                  Pilih kurir dan layanan pengiriman yang Anda inginkan. Biaya ongkir dihitung otomatis berdasarkan berat paket dan alamat tujuan.
+                  Pilih kurir dan layanan pengiriman yang Anda inginkan. Biaya
+                  ongkir dihitung otomatis berdasarkan berat paket dan alamat
+                  tujuan.
                 </p>
 
                 {isLoadingShipping && (
                   <div className="py-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                     <Loader2 className="w-6 h-6 animate-spin text-brand-pink" />
-                    <span className="text-xs font-medium">Menghitung tarif ongkos kirim...</span>
+                    <span className="text-xs font-medium">
+                      Menghitung tarif ongkos kirim...
+                    </span>
                   </div>
                 )}
 
@@ -1390,9 +1607,15 @@ export default function CheckoutContent() {
                           key={`${rate.courier}_${rate.service_code}`}
                           onClick={() => {
                             setSelectedRate(rate);
-                            setFormData((prev) => ({ ...prev, metodePengiriman: rate.shipping_method }));
+                            setFormData((prev) => ({
+                              ...prev,
+                              metodePengiriman: rate.shipping_method,
+                            }));
                             if (errors.metodePengiriman) {
-                              setErrors((prev) => ({ ...prev, metodePengiriman: undefined }));
+                              setErrors((prev) => ({
+                                ...prev,
+                                metodePengiriman: undefined,
+                              }));
                             }
                           }}
                           className={`cursor-pointer rounded-2xl border p-4 transition-all flex items-start justify-between gap-3 ${
@@ -1442,11 +1665,14 @@ export default function CheckoutContent() {
                   </div>
                 )}
 
-                {!isLoadingShipping && shippingRates.length === 0 && !shippingError && (
-                  <p className="text-xs text-muted-foreground italic py-3">
-                    Pilih alamat pengiriman di atas untuk melihat tarif pengiriman.
-                  </p>
-                )}
+                {!isLoadingShipping &&
+                  shippingRates.length === 0 &&
+                  !shippingError && (
+                    <p className="text-xs text-muted-foreground italic py-3">
+                      Pilih alamat pengiriman di atas untuk melihat tarif
+                      pengiriman.
+                    </p>
+                  )}
 
                 {errors.metodePengiriman && (
                   <p className="text-rose-600 text-xs font-medium mt-3 flex items-center gap-1">
@@ -1472,10 +1698,15 @@ export default function CheckoutContent() {
                 {/* Items Mini List */}
                 <div className="divide-y divide-border/60 border-y border-border/60 max-h-72 overflow-y-auto pr-1 mb-5">
                   {items.map((item) => {
-                    const variantEntries = Object.entries(item.selectedVariants);
+                    const variantEntries = Object.entries(
+                      item.selectedVariants,
+                    );
 
                     return (
-                      <div key={item.id} className="py-3.5 flex items-start gap-3">
+                      <div
+                        key={item.id}
+                        className="py-3.5 flex items-start gap-3"
+                      >
                         <div className="w-12 h-12 rounded-lg bg-white border border-border/60 shrink-0 flex items-center justify-center overflow-hidden">
                           <div className="scale-50">
                             {item.product.category === "manik-kaca" && (
@@ -1519,7 +1750,10 @@ export default function CheckoutContent() {
                           {variantEntries.length > 0 && (
                             <p className="text-[11px] text-muted-foreground truncate">
                               {variantEntries
-                                .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`)
+                                .map(
+                                  ([k, v]) =>
+                                    `${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`,
+                                )
                                 .join(" • ")}
                             </p>
                           )}
@@ -1553,7 +1787,7 @@ export default function CheckoutContent() {
                       <span>Biaya Pengiriman</span>
                       <span className="block text-[10px] text-muted-foreground/80">
                         {selectedRate
-                          ? `${selectedRate.courier_name} (${selectedRate.service_name})`
+                          ? `${selectedRate.courier_name} — ${selectedRate.service_name}`
                           : "Pilih opsi pengiriman di samping"}
                       </span>
                     </div>
@@ -1581,7 +1815,9 @@ export default function CheckoutContent() {
                       Total Pembayaran
                     </span>
                     <span className="text-[11px] text-muted-foreground font-normal">
-                      {selectedRate ? "Sudah termasuk ongkos kirim" : "Belum termasuk ongkir"}
+                      {selectedRate
+                        ? "Sudah termasuk ongkos kirim"
+                        : "Belum termasuk ongkir"}
                     </span>
                   </div>
                   <span className="font-sans text-xl font-bold text-foreground font-mono">
@@ -1623,7 +1859,8 @@ export default function CheckoutContent() {
 
                 <div className="mt-4 text-center">
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Pastikan rincian pesanan dan alamat pengiriman telah sesuai sebelum membuat pesanan.
+                    Pastikan rincian pesanan dan alamat pengiriman telah sesuai
+                    sebelum membuat pesanan.
                   </p>
                 </div>
               </div>
@@ -1676,18 +1913,24 @@ export default function CheckoutContent() {
                       type="text"
                       inputMode="numeric"
                       value={newAddrForm.kodePos}
-                      onChange={(e) => handleNewAddrKodePosChange(e.target.value)}
+                      onChange={(e) =>
+                        handleNewAddrKodePosChange(e.target.value)
+                      }
                       placeholder="Masukkan 5 digit kode pos (cth: 60241, 10110)"
                       maxLength={5}
                       className={`w-full pl-9 pr-9 py-2 rounded-xl bg-white border text-xs sm:text-sm focus:outline-none focus:ring-2 transition-all ${
                         newAddrKodePosStatus === "not_found"
                           ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500"
-                          : newAddrKodePosStatus === "found" || (newAddrKodePosStatus === "multiple" && newAddrForm.kelurahan)
-                          ? "border-emerald-400 focus:ring-emerald-500/20 focus:border-emerald-500"
-                          : "border-border focus:ring-brand-pink/20 focus:border-brand-pink"
+                          : newAddrKodePosStatus === "found" ||
+                              (newAddrKodePosStatus === "multiple" &&
+                                newAddrForm.kelurahan)
+                            ? "border-emerald-400 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            : "border-border focus:ring-brand-pink/20 focus:border-brand-pink"
                       }`}
                     />
-                    {(newAddrKodePosStatus === "found" || (newAddrKodePosStatus === "multiple" && newAddrForm.kelurahan)) && (
+                    {(newAddrKodePosStatus === "found" ||
+                      (newAddrKodePosStatus === "multiple" &&
+                        newAddrForm.kelurahan)) && (
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       </div>
@@ -1696,52 +1939,68 @@ export default function CheckoutContent() {
                   {newAddrKodePosStatus === "not_found" && (
                     <p className="text-rose-600 text-[11px] mt-1.5 flex items-center gap-1 font-medium">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>Kode pos tidak ditemukan di wilayah Indonesia. Pastikan 5 digit angka yang benar.</span>
+                      <span>
+                        Kode pos tidak ditemukan di wilayah Indonesia. Pastikan
+                        5 digit angka yang benar.
+                      </span>
                     </p>
                   )}
                 </div>
 
                 {/* 2. PILIHAN WILAYAH JIKA KODE POS MEMILIKI BEBERAPA WILAYAH */}
-                {newAddrKodePosStatus === "multiple" && newAddrKodePosResults.length > 1 && (
-                  <div className="pt-1">
-                    <label className="block text-xs font-semibold text-foreground mb-1">
-                      Pilih Kelurahan / Wilayah yang Sesuai <span className="text-rose-500">*</span>
-                    </label>
-                    <p className="text-[11px] text-muted-foreground mb-2">
-                      Kode pos {newAddrForm.kodePos} mencakup {newAddrKodePosResults.length} kelurahan/desa. Silakan pilih:
-                    </p>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-xl border border-border p-2 bg-white">
-                      {newAddrKodePosResults.map((entry, idx) => {
-                        const isSelected =
-                          newAddrForm.kelurahan === entry.kelurahan &&
-                          newAddrForm.kecamatan === entry.kecamatan;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleNewAddrSelectWilayah(entry)}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between gap-2 ${
-                              isSelected
-                                ? "bg-brand-pink text-white font-semibold shadow-xs"
-                                : "bg-brand-warm/50 hover:bg-brand-pink-soft/40 text-foreground border border-border/40"
-                            }`}
-                          >
-                            <div>
-                              <span className="font-semibold block">{entry.kelurahan}</span>
-                              <span className={`text-[10px] block ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
-                                Kec. {entry.kecamatan}, {entry.kabupatenKota}
-                              </span>
-                            </div>
-                            {isSelected && <Check className="w-4 h-4 shrink-0 text-white" />}
-                          </button>
-                        );
-                      })}
+                {newAddrKodePosStatus === "multiple" &&
+                  newAddrKodePosResults.length > 1 && (
+                    <div className="pt-1">
+                      <label className="block text-xs font-semibold text-foreground mb-1">
+                        Pilih Kelurahan / Wilayah yang Sesuai{" "}
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <p className="text-[11px] text-muted-foreground mb-2">
+                        Kode pos {newAddrForm.kodePos} mencakup{" "}
+                        {newAddrKodePosResults.length} kelurahan/desa. Silakan
+                        pilih:
+                      </p>
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-xl border border-border p-2 bg-white">
+                        {newAddrKodePosResults.map((entry, idx) => {
+                          const isSelected =
+                            newAddrForm.kelurahan === entry.kelurahan &&
+                            newAddrForm.kecamatan === entry.kecamatan;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleNewAddrSelectWilayah(entry)}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between gap-2 ${
+                                isSelected
+                                  ? "bg-brand-pink text-white font-semibold shadow-xs"
+                                  : "bg-brand-warm/50 hover:bg-brand-pink-soft/40 text-foreground border border-border/40"
+                              }`}
+                            >
+                              <div>
+                                <span className="font-semibold block">
+                                  {entry.kelurahan}
+                                </span>
+                                <span
+                                  className={`text-[10px] block ${isSelected ? "text-white/80" : "text-muted-foreground"}`}
+                                >
+                                  Kec. {entry.kecamatan}, {entry.kabupatenKota}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 shrink-0 text-white" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* 3. FIELD WILAYAH TERISI OTOMATIS & READ-ONLY */}
-                {(newAddrForm.provinsi || newAddrForm.kotaKabupaten || newAddrForm.kecamatan || newAddrForm.kelurahan) && (
+                {(newAddrForm.provinsi ||
+                  newAddrForm.kotaKabupaten ||
+                  newAddrForm.kecamatan ||
+                  newAddrForm.kelurahan) && (
                   <div className="pt-2 border-t border-border/60">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-2">
                       Data Wilayah Terisi Otomatis (Sesuai Kode Pos)
@@ -1831,7 +2090,10 @@ export default function CheckoutContent() {
                     required
                     value={newAddrForm.nama}
                     onChange={(e) =>
-                      setNewAddrForm((prev) => ({ ...prev, nama: e.target.value }))
+                      setNewAddrForm((prev) => ({
+                        ...prev,
+                        nama: e.target.value,
+                      }))
                     }
                     placeholder="Nama lengkap penerima"
                     className="w-full px-3 py-2 rounded-xl bg-white border border-border text-xs focus:ring-2 focus:ring-brand-pink/20 focus:border-brand-pink"
