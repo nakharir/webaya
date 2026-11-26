@@ -13,6 +13,7 @@ import type {
   ShippingRateOption,
 } from "@/lib/api/types";
 import { createOrder, calculateShippingRates } from "@/lib/api/ecommerce";
+import { formatRupiah } from "@/lib/api/helpers";
 import { cariWilayah, type WilayahEntry } from "@/lib/kodepos";
 import { TransferProofUpload } from "@/components/krezoema/TransferProofUpload";
 import {
@@ -374,16 +375,6 @@ export default function CheckoutContent() {
     formData.kota,
     items,
   ]);
-
-  // Format currency helper (IDR)
-  const formatRupiah = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,

@@ -9,7 +9,6 @@ import Footer from "@/components/krezoema/Footer";
 import ProductCard from "@/components/krezoema/ProductCard";
 import ProductDetailView from "@/components/krezoema/ProductDetailView";
 import { ArrowLeft, ChevronRight } from "lucide-react";
-import { mockProducts } from "@/data/mockProducts";
 
 export const dynamic = "force-dynamic";
 export const dynamicParams = true;
@@ -32,14 +31,6 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       },
     };
   } catch {
-    // Fallback to mock product check for metadata
-    const mock = mockProducts.find((p) => p.slug === params.slug);
-    if (mock) {
-      return {
-        title: `${mock.name} — KREZOEMA`,
-        description: mock.shortDescription,
-      };
-    }
     return {
       title: "Produk — KREZOEMA",
     };
@@ -52,12 +43,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   try {
     product = await getProductBySlug(params.slug);
   } catch {
-    // If API fetch fails or product not found in API, check fallback
-    const fallback = mockProducts.find((p) => p.slug === params.slug);
-    if (!fallback) {
-      notFound();
-    }
-    // If fallback mock product found, we can construct ApiProduct shape or 404
     notFound();
   }
 

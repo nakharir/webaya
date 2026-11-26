@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { formatRupiah } from "@/lib/api/helpers";
 import { Minus, Plus, Trash2, ArrowRight, ArrowLeft, ShoppingBag } from "lucide-react";
 
 export default function CartContent() {
@@ -19,16 +20,6 @@ export default function CartContent() {
   const { isLoggedIn } = useAuth();
 
   const [confirmClear, setConfirmClear] = useState<boolean>(false);
-
-  // Format currency helper (IDR)
-  const formatRupiah = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   // Prevent hydration mismatch: render a calm loading placeholder until client storage hydrates
   if (!isHydrated) {
